@@ -1,7 +1,7 @@
 [project]
 name = "scirex"
 version = "0.1.0"
-description = "A PDF-to-markdown scientific-knowledge pipeline with OCR benchmarking."
+description = "PDF-to-markdown scientific-knowledge pipeline with OCR benchmarking, knowledge graphs, and RAG."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { file = "LICENSE" }
@@ -9,41 +9,95 @@ authors = [
     { name = "Julien Pigeon" },
 ]
 
-# NOTE: torch is intentionally NOT listed. The NGC container provides an
-# NVIDIA-patched build for Blackwell (sm_120); letting pip/uv install torch
-# from PyPI would overwrite it with a build that may not work on RTX 50-series.
+# IMPORTANT
+# The NGC container nvcr.io/nvidia/pytorch:26.01-py3 provides NVIDIA-patched builds
+# of: torch, torchvision, transformer_engine, flash_attn, apex, triton, numpy,
+# pandas, scipy, scikit-learn, datasets, huggingface_hub, tokenizers, safetensors,
+# einops, pydantic, networkx, pillow, matplotlib, rich, requests, httpx, tqdm,
+# pytest, jupyter, ipykernel, tensorboard, typer-slim, beautifulsoup4, uv.
+# DO NOT redeclare these here — pip would fight the container's builds.
 dependencies = [
-    "numpy<2",
-    "requests",
-    "httpx",
-    "pydantic>=2",
-    "pydantic-settings",
-    "pyyaml",
-    "tqdm",
-    "rich",
+    # Config & logging
+    "pydantic-settings>=2",
     "loguru",
-    "pandas",
-    "duckdb",
+
+    # HTTP retries & robust API clients
+    "tenacity",
+
+    # arXiv
+    "arxiv",
+    "feedparser",
+
+    # PDF handling (not in the container)
     "pypdfium2",
+    "pymupdf",
+    "pdf2image",
+
+    # Storage
+    "duckdb",
+    "sqlalchemy>=2",
 ]
 
 [project.optional-dependencies]
+
 dev = [
-    "pytest",
+    # Note: pytest, black, isort, ipykernel, jupyter already in container.
     "pytest-cov",
+    "pytest-asyncio",
     "ruff",
-    "ipykernel",
-    "jupyter",
+    "mypy",
 ]
+
 training = [
     "wandb",
+    "torchmetrics",
+    "tiktoken",
+    "sentencepiece",
 ]
+
 ocr = [
-    "pillow",
     "opencv-python-headless",
+    "scikit-image",
+    "jiwer",
+    "editdistance",
+    "sacrebleu",
+    "python-Levenshtein",
+    "lxml",
 ]
+
+llm = [
+    "transformers>=4.44",
+    "accelerate",
+    "bitsandbytes",
+    "peft",
+    "instructor",
+    "outlines",
+]
+
+graph = [
+    # networkx is already in the container
+    "pyvis",
+    "igraph",
+    "python-louvain",
+]
+
+rag = [
+    "sentence-transformers",
+    "qdrant-client",
+    "chromadb",
+    "rank-bm25",
+    "ragas",
+    "llama-index-core",
+]
+
 demo = [
     "streamlit",
+    "plotly",
+    "altair",
+]
+
+all = [
+    "scirex[dev,training,ocr,llm,graph,rag,demo]",
 ]
 
 [build-system]
@@ -64,3 +118,11 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+addopts = "-ra --strict-markers"
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true

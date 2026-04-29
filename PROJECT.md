@@ -25,6 +25,7 @@ Phase 0 — environment & repo setup.
 - Which modern OCR models beyond Chandra-2, Marker, Nougat, olmOCR should we include?
 - Final paper count for LaTeX-aligned benchmark (target: 1–2k).
 - Whether to use Qdrant vs. ChromaDB for RAG.
+- Implementing TurboQuant to the final LLM used for inference.
 
 ## Next actions
 1. Complete repo scaffold, first commit, GitHub push.
