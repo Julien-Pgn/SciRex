@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "PDF-to-markdown scientific-knowledge pipeline with OCR benchmarking, knowledge graphs, and RAG."
 readme = "README.md"
 requires-python = ">=3.12"
-license = { file = "LICENSE" }
+license = { file = "LICENSE.txt" }
 authors = [
     { name = "Julien Pigeon" },
 ]
