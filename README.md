@@ -20,6 +20,22 @@ scientific literature as a case study. Contributions:
 
 Coming soon.
 
+## Running the dev container
+
+All container operations go through `./run_container.sh`.
+
+| Command | Purpose |
+|---|---|
+| `./run_container.sh shell` | Open an interactive bash session in the container |
+| `./run_container.sh exec <cmd>` | Run a one-shot command (e.g. `exec pytest`) |
+| `./run_container.sh jupyter` | Start JupyterLab on http://localhost:8888 |
+| `./run_container.sh streamlit` | Start the Streamlit demo on http://localhost:8501 |
+| `./run_container.sh stop jupyter` | Stop the Jupyter daemon |
+| `./run_container.sh logs jupyter` | Follow Jupyter logs |
+| `./run_container.sh build` | Rebuild the image |
+
+Optional environment variables (read from your shell): `WANDB_API_KEY`, `HF_TOKEN`.
+
 ## License
 
 MIT (code) — see `LICENSE`.
