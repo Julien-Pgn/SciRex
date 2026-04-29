@@ -64,6 +64,7 @@ Target: mid-May for Phases 1-4 + 8 (apply to jobs). Phases 5-7 marked "in progre
 - HF blog: https://huggingface.co/blog/nielsr/ocr-papers-jobs
 - HF corpus: `nielsr/arxiv-chandra-ocr-full-markdown-20260406` (27k papers)
 - Reference repo: https://github.com/NielsRogge/arxiv-ocr
+- ArXiv APIs and bulk data : https://info.arxiv.org/help/bulk_data/index.html
 - OlmOCRBench: https://huggingface.co/datasets/allenai/olmOCR-bench
 - Nemotron-OCR-v2 (released 2026-04-15): https://huggingface.co/nvidia/nemotron-ocr-v2
 - TurboQuant: https://research.google/blog/turboquant-redefining-ai-efficiency-with-extreme-compression/
