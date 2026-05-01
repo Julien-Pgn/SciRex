@@ -23,7 +23,14 @@ Repo: github.com/Julien-Pgn/scirex
 - 2026-04-29: Dependency groups in pyproject map to phases: dev, training, ocr, llm, graph, rag, demo. `[all]` is meta-group for full dev container.
 - 2026-04-29: Excluded from pyproject (NGC provides): torch family, transformers tokenizers, datasets, huggingface_hub, einops, safetensors, scipy, scikit-learn, pillow, networkx, beautifulsoup4, pytest, ipykernel, jupyter, tensorboard.
 - 2026-04-29: Skipped Hydra (overkill); using Pydantic Settings. Skipped Makefile (use scripts/). Skipped pre-commit (CI handles linting). Skipped FastAPI (Streamlit is sufficient).
-- 2026-04-30: deferred conference-acceptance enrichment (NeurIPS, ICLR, etc.) to Phase 5. Plan: use Semantic Scholar API for arxiv_id → venue/year matching, not HTML scraping.
+- 2026-05-01: Phase 1 complete. Final state:
+    - 1 Kaggle dump → 5 normalized DuckDB tables
+    - benchmark_subset = 900 papers (cs.RP typo'd; deferred fix, see 04-30 entry)
+    - 996 PDFs + LaTeX archives fetched (some smoke + main runs)
+    - 916/996 (92%) LaTeX archives successfully extracted
+    - 80 failures appear to be PDF-only submissions or truncated downloads (not investigated, sufficient corpus for benchmarking)
+- 2026-05-01: Decided to NOT investigate the 80 LaTeX extraction failures. 916 is well above the 500+ threshold needed for OCR benchmarking. Time better spent on Phase 2.
+- 2026-05-01: Conference enrichment (NeurIPS/ICLR/etc) deferred to Phase 5. Plan: Semantic Scholar API for arxiv_id → venue/year, not HTML scraping.
 
 ## Project scope (locked)
 1. **Phase 1 — Ingestion (3-4 days):** ArXiv OAI-PMH async client, LaTeX-source download, DuckDB metadata store, resumable.
