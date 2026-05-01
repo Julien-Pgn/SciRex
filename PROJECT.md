@@ -23,6 +23,7 @@ Repo: github.com/Julien-Pgn/scirex
 - 2026-04-29: Dependency groups in pyproject map to phases: dev, training, ocr, llm, graph, rag, demo. `[all]` is meta-group for full dev container.
 - 2026-04-29: Excluded from pyproject (NGC provides): torch family, transformers tokenizers, datasets, huggingface_hub, einops, safetensors, scipy, scikit-learn, pillow, networkx, beautifulsoup4, pytest, ipykernel, jupyter, tensorboard.
 - 2026-04-29: Skipped Hydra (overkill); using Pydantic Settings. Skipped Makefile (use scripts/). Skipped pre-commit (CI handles linting). Skipped FastAPI (Streamlit is sufficient).
+- 2026-04-30: deferred conference-acceptance enrichment (NeurIPS, ICLR, etc.) to Phase 5. Plan: use Semantic Scholar API for arxiv_id → venue/year matching, not HTML scraping.
 
 ## Project scope (locked)
 1. **Phase 1 — Ingestion (3-4 days):** ArXiv OAI-PMH async client, LaTeX-source download, DuckDB metadata store, resumable.

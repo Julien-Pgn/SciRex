@@ -123,7 +123,6 @@ def main() -> None:
 
     with duckdb.connect(DB_PATH) as conn:
         arxiv_ids = get_papers_to_fetch(conn)
-        arxiv_ids = arxiv_ids[:100]  # TEMP: limit for testing; remove to fetch all
         n = len(arxiv_ids)
         log.info(f"Starting fetch run: {n} papers to download")
 
