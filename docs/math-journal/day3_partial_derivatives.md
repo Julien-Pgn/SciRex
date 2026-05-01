@@ -61,7 +61,8 @@ $$\frac{\partial f}{\partial w2} = 8(w1 +4w2-10)$$
 $$\frac{\partial f}{\partial w1} = -8$$
 $$\frac{\partial f}{\partial w1} = -32$$
 (e) In one sentence each, explain in plain English: (i) what the _sign_ of $\partial L / \partial w_1$ at $(2, 1)$ tells gradient descent to do, and (ii) why $\partial L / \partial w_2$ is four times $\partial L / \partial w_1$ in magnitude (think about the input features).
-The negative sign of $\frac{\partial f}{\partial w1}$ tells gradient descent to increase the values to minimize the loss for the next epoch. $\frac{\partial f}{\partial w2}$ being 4 times $\frac{\partial f}{\partial w1}$ means that a small changes in the weights of 2 will move the loss function 4 times more than modifying w1. 
+- The negative sign of $\frac{\partial f}{\partial w1}$ tells gradient descent to increase the values to minimize the loss for the next epoch. $\frac{\partial f}{\partial w2}$ being 4 times $\frac{\partial f}{\partial w1}$ means that a small changes in the weights of 2 will move the loss function 4 times more than modifying w1. 
+- Correction: Gradient descent moves the weight in the opposite direction of the gradient. Concerning the 4 times difference: **The deep ML principle**: weights connected to large-magnitude features receive proportionally larger gradient updates. This is why **feature scaling** (standardizing features to similar magnitudes) is one of the first preprocessing steps in any ML pipeline — without it, weights tied to large features dominate training and weights tied to small features barely move. You'll see this in scikit-learn as `StandardScaler` or `MinMaxScaler`. 
 ### Exercise 3.6 — find a critical point
 
 Let $f(x, y) = x^2 + y^2 - 4x + 6y + 5$.
@@ -84,6 +85,8 @@ $$
 $$f(2, -3) = 4 +9 -8 - 18 +5 = -8$$
 (d) In one sentence, explain why setting all partial derivatives to zero is the multivariable generalization of "set the derivative to zero" from Day 1. _Hint:_ think about when none of the inputs has any direction of decrease.
 - I wish I knew but fatigue is getting me. 
+- Correction: In single-variable calculus, "derivative = 0" means the function is *flat* at that point — the slope is zero, so neither moving left nor right changes ff f to first order. That's the defining condition of a minimum, maximum, or inflection. In multivariable calculus, the function has many "directions to move" — not just left/right but every direction in the input space. Each partial derivative measures the rate of change in _one specific axis direction_. So "all partials = 0" means **the function doesn't change to first order in any axis direction.** But why does that catch all minima? It turns out (and this is a real theorem you'll use later) that if a function changes in any direction, it must change in at least one axis direction too. So **all partials = 0 ⟺ no direction of immediate change ⟺ candidate for minimum/maximum**.
+- In ML terms: at a minimum of the loss, the gradient (vector of all partials) is zero. Gradient descent is, in fact, defined to halt when the gradient is sufficiently close to zero — because at that point, no weight update would meaningfully reduce the loss. **"Gradient = 0" is the multivariable generalization of "derivative = 0," and it is the convergence criterion for training.**
 
 ---
 
@@ -98,13 +101,14 @@ Answer each in one or two sentences in your own words.
 	1. Y and z are treated as constants and $\frac{\partial f}{\partial x} = 2xyz$
     
 3. A neural network has 1 million weights. How many partial derivatives appear in the gradient of its loss function? In plain English, what does each one tell us?
-	1. It has 1 million partial derivatives. Each one tells us how important they are in the loss function realatively to the others. 
+	1. It has 1 million partial derivatives. Each one tells us how important they are in the loss function relatively to the others. 
+	2. Correction: Each partial derivative tells gradient descent how much (and in what direction) to update one specific weight at the current point in training. The partial derivative doesn't tell how important a weight is but tells the local sensitivity at the current weight setting how much the loss would change if you nudged w slightly. 
     
 4. Why is the answer for $\partial f / \partial y$ in Section 7's example ($3(x^2+y)^2$) the same as the _outer factor_ of $\partial f / \partial x$? What does this say about the efficiency of computing many partials at once?
 	1. It is the same due to the chain rule where we are computing derivatives of a function in a function. Thus we have the same outer function in both partial derivatives which saves computing as it is calculated once and placed in cache for the other partial derivatives computing. 
     
 5. Suppose at some weight setting in a neural network, $\partial L / \partial w_1 = +0.5$ and $\partial L / \partial w_2 = -0.3$. In one sentence, what should gradient descent do to each weight, and why?
-	1. Gradient descent should move w1 lower, in the negatives to reduce the loss and move w2 in the positives to reduce the loss (the derivative tells us that the tangent at this point has a negative slope so we should increase w2 to further lower the loss function). 
+	1. Gradient descent should move w1 lower, in the negatives to reduce the loss and move w2 in the positives to reduce the loss. The partial derivative being negative, means that the loss decreases as w2 increases so gradient descent increases w2. 
     
 
 ---
