@@ -36,6 +36,9 @@ All container operations go through `./run_container.sh`.
 
 Optional environment variables (read from your shell): `WANDB_API_KEY`, `HF_TOKEN`.
 
+## Perspective
+This project aims to integrate various domain knowledge databases into a single AI layer that can reason across it. So far, it integrates scientific literature (mostly computer science, but soon biology and medicine), but will hopefully one day, if I have time, integrate code from Github.
+
 ## License
 
 MIT (code) — see `LICENSE`.
