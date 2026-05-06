@@ -55,7 +55,11 @@ S3 requester-pays bucket considered and rejected: ~$100 + 1.1TB for content we d
 2026-05-01: Three-state extraction outcome: OK (got .tex, DB updated), NOTEX (extracted, no .tex found, DB not updated → re-eligible), FAIL (exception, DB not updated → re-eligible).
 
 ### Phase2a
+2026-05-06: Skip this phase for now and focus on OCR
 
+### Phase2b:
+2026-05-06: Let's replicate the OCR usage from Landing.AI course on DeepLearning.ai and then move to LLMs and RAG building at the same time to go faster on the learning aspect. 
+2026-05-06: add a .env.example file to the project. It should only refer to the keys you will use. Then copy this into .env and add the correct APIs key. Verify you have .env in the .gitignore so your keys are never commited to your repo.
 
 ## Project scope (locked)
 1. **Phase 1 — Ingestion - DONE - (3 days):** Kaggle dump → DuckDB schema → benchmark_subset selection → API fetcher → LaTeX extractor.
