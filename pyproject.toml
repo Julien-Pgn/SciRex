@@ -63,6 +63,7 @@ ocr = [
     "sacrebleu",
     "python-Levenshtein",
     "lxml",
+    "easyocr",
 ]
 
 llm = [
