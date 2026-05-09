@@ -62,7 +62,9 @@ S3 requester-pays bucket considered and rejected: ~$100 + 1.1TB for content we d
 2026-05-06: add a .env.example file to the project. It should only refer to the keys you will use. Then copy this into .env and add the correct APIs key. Verify you have .env in the .gitignore so your keys are never commited to your repo.
 2026-05-07: Add paddleocr in pyproject.toml file and rebuilt the docker image
 2026-05-07: Pivoted from PaddleOCR to EasyOCR for the OCR step. PaddleOCR 3.3.x raised persistent Intel MKL dispatch errors on the NGC PyTorch container despite a clean install (paddle.utils.run_check passed, MKL libraries present); after FLAGS_use_mkldnn=0 and verbose tracing produced no fix, EasyOCR (pure PyTorch, no native-library drama) was chosen as the pragmatic substitute for the same architectural role in the agentic pipeline.
-2026-05-07: I have to find a way to get the 
+2026-05-09: LayoutReader is not that good for getting the reading order of a scientific apper correctly. 
+2026-05-09: I will use a YOLO model for detecting the layout from the document as paddle ocr would do. 
+
 ## Project scope (locked)
 1. **Phase 1 — Ingestion - DONE - (3 days):** Kaggle dump → DuckDB schema → benchmark_subset selection → API fetcher → LaTeX extractor.
 2. **Phase 2a — CRNN from scratch (5-6 days):** CNN + BiLSTM + CTC, hand-derived forward-backward CTC pass.
