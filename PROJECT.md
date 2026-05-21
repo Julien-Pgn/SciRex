@@ -64,6 +64,7 @@ S3 requester-pays bucket considered and rejected: ~$100 + 1.1TB for content we d
 2026-05-07: Pivoted from PaddleOCR to EasyOCR for the OCR step. PaddleOCR 3.3.x raised persistent Intel MKL dispatch errors on the NGC PyTorch container despite a clean install (paddle.utils.run_check passed, MKL libraries present); after FLAGS_use_mkldnn=0 and verbose tracing produced no fix, EasyOCR (pure PyTorch, no native-library drama) was chosen as the pragmatic substitute for the same architectural role in the agentic pipeline.
 2026-05-09: LayoutReader is not that good for getting the reading order of a scientific apper correctly. 
 2026-05-09: I will use a YOLO model for detecting the layout from the document as paddle ocr would do. 
+2026-05-20: Skip the agentic OCR workflow for now as it is not optimized (recent VLM are much better at it, so let's dive in this directly)
 
 ## Project scope (locked)
 1. **Phase 1 — Ingestion - DONE - (3 days):** Kaggle dump → DuckDB schema → benchmark_subset selection → API fetcher → LaTeX extractor.
@@ -76,11 +77,6 @@ S3 requester-pays bucket considered and rejected: ~$100 + 1.1TB for content we d
 8. **Phase 7 — Production RAG (4-5 days):** Chunking ablation, embeddings, Qdrant or ChromaDB, retrieval eval (Recall@k, MRR, RAGAS). Local generation via Ollama with 4-bit quantized 7-14B model.
 9. **Phase 8 — Polish (ongoing + 2 days):** Per-phase blog posts, README, architecture diagram, demo video.
 
-Target: mid-May for Phases 1-4 + 8 (apply to jobs). Phases 5-7 marked "in progress" on ROADMAP.md.
-
-## Strategic narrative for interviews
-"HuggingFace solved bulk OCR (27k papers via Chandra-2). I solved the **evaluation problem** with LaTeX-aligned ground truth, and built the **knowledge layer** on top. CRNN from scratch as pedagogical baseline. RAG, not pretraining, for the queryable assistant — pretraining is the educational PoC."
-
 ### Phase 1 talking points:
 "Evaluated three ingestion paths, picked the hybrid that fit the data scale."
 "ELT in DuckDB — staged raw, transformed in SQL, kept lineage in ingestion_runs."
@@ -88,7 +84,6 @@ Target: mid-May for Phases 1-4 + 8 (apply to jobs). Phases 5-7 marked "in progre
 "92% LaTeX-source extraction rate on cs.* papers — that's my OCR ground truth."
 
 ## Known risks
-- MVC mode warning on every container start until host driver upgrade.
 - bitsandbytes for sm_120 — installed but not yet exercised. Validate in Phase 6.
 - ragas + langchain-community installed; potential conflict if transformers upgraded.
 - Chandra-2 weights ~5B — 4-bit quantization or model offload required for 16 GB VRAM.

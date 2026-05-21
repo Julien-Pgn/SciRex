@@ -64,6 +64,7 @@ ocr = [
     "python-Levenshtein",
     "lxml",
     "easyocr",
+    "chandra-ocr",
 ]
 
 llm = [
