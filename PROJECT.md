@@ -65,6 +65,10 @@ S3 requester-pays bucket considered and rejected: ~$100 + 1.1TB for content we d
 2026-05-09: LayoutReader is not that good for getting the reading order of a scientific apper correctly. 
 2026-05-09: I will use a YOLO model for detecting the layout from the document as paddle ocr would do. 
 2026-05-20: Skip the agentic OCR workflow for now as it is not optimized (recent VLM are much better at it, so let's dive in this directly)
+2026-05-22: Problems with Chandra-ocr in my environemnt because transformers was too old. I had to get a newer version and remove marker-pdf because of conflicting versions. 
+2026-05-22: Now Chandra 2 works well but is long: 1min for 1 page with HF (transformers without flashattention). Bitsandbytes doesn't work with CUDA 13 so i I used torchao which is already installe din the NGC container. Int8 quantization is fine to run on my GPU. 
+2026-05-22: Adding ipywidgets to pyproject.toml for interactove progress bars. 
+
 
 ## Project scope (locked)
 1. **Phase 1 — Ingestion - DONE - (3 days):** Kaggle dump → DuckDB schema → benchmark_subset selection → API fetcher → LaTeX extractor.

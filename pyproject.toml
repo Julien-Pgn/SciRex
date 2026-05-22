@@ -46,6 +46,7 @@ dev = [
     "pytest-asyncio",
     "ruff",
     "mypy",
+    "ipywidgets",
 ]
 
 training = [
@@ -64,11 +65,11 @@ ocr = [
     "python-Levenshtein",
     "lxml",
     "easyocr",
-    "chandra-ocr",
+    "chandra-ocr[hf]",
 ]
 
 llm = [
-    "transformers>=4.44",
+    "transformers>=4.58",
     "accelerate",
     "bitsandbytes",
     "peft",
@@ -90,6 +91,10 @@ rag = [
     "rank-bm25",
     "ragas",
     "llama-index-core",
+    "llama-index-vector-stores-qdrant",
+    "llama-index-llms-ollama",
+    "llama-index-embeddings-huggingface",
+    "llama-index-postprocessor-flag-embedding-reranker",
 ]
 
 demo = [
