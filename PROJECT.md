@@ -6,13 +6,12 @@ Repo: github.com/Julien-Pgn/scirex
 ## Current phase
 ✅ Phase 0 complete. Starting Phase 1 — ingestion.
 ✅ Phase 1 complete (2026-05-01). See full close-out in Decisions log.
-⏭ Starting Phase 2a — CRNN from scratch.
 
 ## Environment
 - Base image: `nvcr.io/nvidia/pytorch:26.01-py3` (Python 3.12.3, PyTorch 2.10.0a NV-patched, CUDA 13.1, sm_120 supported)
 - Image tag: `scirex:dev`
 - Hardware: RTX 5070 Ti (Blackwell, 16 GB VRAM)
-- Host driver: 580.126.09 (CUDA 13.0) — runs container in MVC mode; upgrade before Phase 2b benchmarks
+- Host driver: 590.48.01 (CUDA 13.0) 
 - Package manager: `uv` 0.9.24 (preinstalled in NGC). `--system --break-system-packages` for installs.
 - Editable install: confirmed working via `_editable_impl_scirex.pth`. Host edits are live in container.
 
@@ -66,7 +65,7 @@ S3 requester-pays bucket considered and rejected: ~$100 + 1.1TB for content we d
 2026-05-09: I will use a YOLO model for detecting the layout from the document as paddle ocr would do. 
 2026-05-20: Skip the agentic OCR workflow for now as it is not optimized (recent VLM are much better at it, so let's dive in this directly)
 2026-05-22: Problems with Chandra-ocr in my environemnt because transformers was too old. I had to get a newer version and remove marker-pdf because of conflicting versions. 
-2026-05-22: Now Chandra 2 works well but is long: 1min for 1 page with HF (transformers without flashattention). Bitsandbytes doesn't work with CUDA 13 so i I used torchao which is already installe din the NGC container. Int8 quantization is fine to run on my GPU. 
+2026-05-22: Now Chandra 2 works well but is long: 1min for 1 page with HF (transformers with flashattention). Bitsandbytes doesn't work with CUDA 13 so i I used torchao which is already installed in the NGC container. Int8 quantization is fine to run on my GPU. 
 2026-05-22: Adding ipywidgets to pyproject.toml for interactove progress bars. 
 
 
@@ -85,17 +84,17 @@ S3 requester-pays bucket considered and rejected: ~$100 + 1.1TB for content we d
 "Evaluated three ingestion paths, picked the hybrid that fit the data scale."
 "ELT in DuckDB — staged raw, transformed in SQL, kept lineage in ingestion_runs."
 "Retries at the I/O boundary, resumability via DB state, not filesystem."
-"92% LaTeX-source extraction rate on cs.* papers — that's my OCR ground truth."
+"92% LaTeX-source extraction rate on cs.* papers = OCR ground truth."
 
 ## Known risks
-- bitsandbytes for sm_120 — installed but not yet exercised. Validate in Phase 6.
+- bitsandbytes for sm_120 — installed but not yet exercised. DOesn't work with CUDA 13 - use torchao instead.
 - ragas + langchain-community installed; potential conflict if transformers upgraded.
-- Chandra-2 weights ~5B — 4-bit quantization or model offload required for 16 GB VRAM.
+- Chandra-2 weights ~5B — 8-bit quantization works on RTX 5070Ti with 16 GB VRAM.
 - TurboQuant (Google KV-cache compression) flagged for Phase 7 if VRAM becomes binding.
 - NEW: Phase 2a math depth. CTC derivation requires solid grasp of dynamic programming + log-space arithmetic. Daily math exercises in progress; if math feels shaky after Day 2, take a math-only day before continuing.
 
 ## Open questions
-- bioRxiv ingestion in Phase 1: include now or defer to v2? (current default: defer; arXiv only for v1)
+- bioRxiv ingestion in Phase 1: in v2
 - Vector DB choice in Phase 7: Qdrant vs. ChromaDB. Decide at Phase 7 entry.
 - Phase 2a backward-pass implementation vs. derivation-only: decide at end of Day 2 based on math comfort.
 - Phase 2a beam search: decide at Day 10 based on time remaining.

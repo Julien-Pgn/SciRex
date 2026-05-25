@@ -6,7 +6,7 @@ A PDF-to-markdown knowledge pipeline with rigorous OCR benchmarking to build RAG
 
 ## What this project is
 
-A general pipeline for turning PDF corpora into a queryable knowledge base, using
+A general pipeline for turning PDFs into a queryable knowledge base, using
 scientific literature as a case study. Contributions:
 
 - **OCR benchmark** on OlmOCRBench and LaTeX-aligned arXiv ground truth, comparing
@@ -37,7 +37,7 @@ All container operations go through `./run_container.sh`.
 Optional environment variables (read from your shell): `WANDB_API_KEY`, `HF_TOKEN`.
 
 ## Perspective
-This project aims to integrate various domain knowledge databases into a single AI layer that can reason across it. So far, it integrates scientific literature (mostly computer science, but soon biology and medicine), but will hopefully one day, if I have time, integrate code from Github.
+This project aims to integrate various domain knowledge databases into a single AI layer that can reason across it. So far, it integrates scientific literature (mostly computer science, but soon biology and medicine), and hopefully one day integrate code from Github.
 
 ## License
 
