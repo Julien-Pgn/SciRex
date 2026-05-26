@@ -66,8 +66,11 @@ S3 requester-pays bucket considered and rejected: ~$100 + 1.1TB for content we d
 2026-05-20: Skip the agentic OCR workflow for now as it is not optimized (recent VLM are much better at it, so let's dive in this directly)
 2026-05-22: Problems with Chandra-ocr in my environemnt because transformers was too old. I had to get a newer version and remove marker-pdf because of conflicting versions. 
 2026-05-22: Now Chandra 2 works well but is long: 1min for 1 page with HF (transformers with flashattention). Bitsandbytes doesn't work with CUDA 13 so i I used torchao which is already installed in the NGC container. Int8 quantization is fine to run on my GPU. 
-2026-05-22: Adding ipywidgets to pyproject.toml for interactove progress bars. 
-
+2026-05-22: Adding ipywidgets to pyproject.toml for interactive progress bars. 
+2026-05-25: Downloaded the Docker image for vLLM: "vllm/vllm-openai:v0.17.0" and created a run_vllm.sh script to run it in jupyter notebook to measure inference time compared to HF. It runs 6 times faster than HF inference mode.
+2026-05-26: It is not because of the lack of authentification. I tested it once more but still 1 min per page.
+2026-05-26: I modified the run_container.sh files for better understanding and to launch a mode without GPU access so the vLLM container gets it all for OCR. 
+2026-05-26: When the NGC container doesn't use the GPU, it takes 7sec per page on average with vllm. 
 
 ## Project scope (locked)
 1. **Phase 1 — Ingestion - DONE - (3 days):** Kaggle dump → DuckDB schema → benchmark_subset selection → API fetcher → LaTeX extractor.

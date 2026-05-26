@@ -21,6 +21,7 @@ COMMON_FLAGS=(
     --ulimit memlock=-1
     --ulimit stack=67108864
     --shm-size=16g
+    --network scirex-net
     -v "$(pwd):/workspace"
     -v "$HOME/.cache/huggingface:/root/.cache/huggingface"
     -e "WANDB_API_KEY=${WANDB_API_KEY:-}"
