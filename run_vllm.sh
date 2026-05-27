@@ -18,11 +18,11 @@ CMD="${1:-help}"
 
 case "$CMD" in
 
-    # "up" starts the vLLM server in detached mode. The model is loaded once into VRAM and exposed via an OpenAI-compatible HTTP API on port 8000. Bound to 127.0.0.1 so only the local host can reach it.
+    # "up" starts the vLLM server. The model is loaded once into VRAM and exposed via an OpenAI-compatible HTTP API on port 8000. Bound to 127.0.0.1 so only the local host can reach it.
     up)
         # Idempotent restart: remove any previous container with the same name.
         docker rm -f "$NAME" >/dev/null 2>&1 || true
-        docker run -d \
+        docker run \
             --name "$NAME" \
             --gpus all \
             --ipc=host \
