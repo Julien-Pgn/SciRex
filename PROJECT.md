@@ -70,7 +70,10 @@ S3 requester-pays bucket considered and rejected: ~$100 + 1.1TB for content we d
 2026-05-25: Downloaded the Docker image for vLLM: "vllm/vllm-openai:v0.17.0" and created a run_vllm.sh script to run it in jupyter notebook to measure inference time compared to HF. It runs 6 times faster than HF inference mode.
 2026-05-26: It is not because of the lack of authentification. I tested it once more but still 1 min per page.
 2026-05-26: I modified the run_container.sh files for better understanding and to launch a mode without GPU access so the vLLM container gets it all for OCR. 
-2026-05-26: When the NGC container doesn't use the GPU, it takes 7sec per page on average with vllm. 
+2026-05-26: When the NGC container doesn't use the GPU, it takes 7sec per page on average with vllm.
+2026-05-27: Runnning OCR on 100 papers with the 2 containers and adding logging, stats saving.  
+2026-05-28: Multithreading improves overall performances on large pdf. But no gains when many small pdf: reduction of max workers to increase the number of pdf treated in parallel. 
+
 
 ## Project scope (locked)
 1. **Phase 1 — Ingestion - DONE - (3 days):** Kaggle dump → DuckDB schema → benchmark_subset selection → API fetcher → LaTeX extractor.
