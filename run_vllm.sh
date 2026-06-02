@@ -33,7 +33,7 @@ case "$CMD" in
                 --model datalab-to/chandra-ocr-2 \
                 --dtype bfloat16 \
                 --max-model-len 8192 \
-                --gpu-memory-utilization 0.70 \
+                --gpu-memory-utilization 0.85 \
                 --quantization bitsandbytes \
                 --served-model-name chandra
         echo "vLLM server starting (model load ~30-60s)."
