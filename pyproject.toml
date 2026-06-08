@@ -36,6 +36,9 @@ dependencies = [
     # Storage
     "duckdb",
     "sqlalchemy>=2",
+
+    # Data
+    "kagglehub" 
 ]
 
 [project.optional-dependencies]
