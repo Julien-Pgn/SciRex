@@ -13,6 +13,8 @@ import logging
 import time
 from pathlib import Path
 
+import argparse
+
 import duckdb
 import requests
 from requests.exceptions import RequestException
@@ -77,14 +79,14 @@ def fetch_source(arxiv_id: str, output_dir: Path) -> Path:
 
 
 # Get the list of ArXiv papers to dowload
-def get_papers_to_fetch(conn: duckdb.DuckDBPyConnection) -> list[str]:
-    """Return arxiv_ids from benchmark_subset whose pdf_path is still NULL in papers."""
-    rows = conn.execute("""
-        SELECT bs.arxiv_id
-        FROM benchmark_subset bs
-        JOIN papers p USING (arxiv_id)
-        WHERE p.pdf_path IS NULL
-        ORDER BY bs.arxiv_id
+def get_papers_to_fetch(conn: duckdb.DuckDBPyConnection, table: str) -> list[str]:
+    """Return arxiv_ids from 'table' whose pdf_path is still NULL in paper_local."""
+    rows = conn.execute(f"""
+        SELECT s.arxiv_id
+        FROM {table} s
+        LEFT JOIN paper_local pl USING (arxiv_id)
+        WHERE pl.pdf_path IS NULL
+        ORDER BY s.arxiv_id
     """).fetchall()
     return [row[0] for row in rows]
 
@@ -93,21 +95,32 @@ def update_paper_paths(conn: duckdb.DuckDBPyConnection, arxiv_id: str, pdf_path:
     """Mark a paper as fetched by writing its file paths into the papers table."""
     conn.execute(
         """
-        UPDATE papers
-        SET pdf_path = ?,
-            latex_source_path = ?
-        WHERE arxiv_id = ?
+        INSERT INTO paper_local (arxiv_id, pdf_path, latex_source_path)
+        VALUES (?, ?, ?)
+        ON CONFLICT (arxiv_id) DO UPDATE SET
+            pdf_path = EXCLUDED.pdf_path,
+            latex_source_path = EXCLUDED.latex_source_path
         """,
-        [str(pdf_path), str(source_path), arxiv_id],
+        [arxiv_id, str(pdf_path), str(source_path)],   
     )
 
 
 # Main loop:
 def main() -> None:
-    """Fetch PDFs and LaTeX sources for the benchmark subset.
+    """Fetch PDFs and LaTeX sources for the benchmark subset."""
 
-    Best-effort: per-paper failures are logged but the run continues.
-    """
+    parser = argparse.ArgumentParser(description="Fetch PDFs/LaTeX for a subset table.")
+    parser.add_argument(
+        "--table",
+        required=True ,
+        help="Table DuckDB listing all papers to download (default: 'subset')",
+    )
+    args = parser.parse_args()
+
+    # Security
+    if not args.table.isidentifier():
+        raise ValueError(f"Invalid table name: {args.table}")
+
     for d in (PDF_DIR, SRC_DIR, LOG_DIR):
         d.mkdir(parents=True, exist_ok=True)
 
@@ -122,7 +135,17 @@ def main() -> None:
     log = logging.getLogger(__name__)
 
     with duckdb.connect(DB_PATH) as conn:
-        arxiv_ids = get_papers_to_fetch(conn)
+
+        # Verify that the table exists
+        exists = conn.execute("""
+            SELECT 1 FROM information_schema.tables WHERE table_name = ?""", 
+                              [args.table],
+                                ).fetchone() is not None
+        if not exists:
+            log.error(f"Table '{args.table}' does not exist in the database. Exiting.")
+            raise ValueError(f"Table '{args.table}' does not exist in the database.")
+
+        arxiv_ids = get_papers_to_fetch(conn, args.table)
         n = len(arxiv_ids)
         log.info(f"Starting fetch run: {n} papers to download")
 
