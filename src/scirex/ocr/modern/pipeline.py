@@ -27,7 +27,7 @@ def pdf_to_images(pdf_path, max_pages = None, dpi = 192):
     return img_list
 
 
-def images_to_markdown(images, max_output_tokens=4096, max_workers=8):
+def images_to_markdown(images, max_output_tokens=8192, max_workers=8):
     '''Receives a list of PIL images, returns the concatenated markdown and per-page stats.'''
     
     batch = [BatchInputItem(image=img, prompt_type="ocr_layout") for img in images]
