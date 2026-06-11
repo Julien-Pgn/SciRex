@@ -73,18 +73,26 @@ S3 requester-pays bucket considered and rejected: ~$100 + 1.1TB for content we d
 2026-05-26: When the NGC container doesn't use the GPU, it takes 7sec per page on average with vllm.
 2026-05-27: Runnning OCR on 100 papers with the 2 containers and adding logging, stats saving.  
 2026-05-28: Multithreading improves overall performances on large pdf. But no gains when many small pdf: reduction of max workers to increase the number of pdf treated in parallel. 
+2026-06-10: pdfs in parallel, 8 max workers and 28 requests at the same time for the GPU works well. 
+2026-06-10: Scope cut after external review. Critical path = pipeline state → OCR → chunking → Qdrant → retrieval eval → agent → digest/MCP. Deferred (not deleted): full OCR benchmark, knowledge graph phase, GPT-from-scratch (separate repo), Streamlit demo. Rationale: each deferred item is a project of its own; none blocks the stated goal.
+2026-06-10: Vector DB decided: Qdrant over ChromaDB. Reasons: runs as a Docker service (matches the vLLM pattern), payload filtering for metadata-constrained queries, native dense+sparse hybrid in one collection, quantization headroom. DuckDB stays the source of truth for metadata; Qdrant stores chunk vectors + minimal payload keyed on arxiv_id. Never duplicate full metadata into Qdrant.
+2026-06-10: Embeddings: BGE-M3 (dense + sparse from one model, 8k context) — validate VRAM fit on the 5070 Ti alongside other loads before locking.
+2026-06-10: Bootstrap the RAG with the HF 27k Chandra corpus while own OCR run completes; own 900-paper pipeline is the validation set, not the bottleneck.
+2026-06-10: CI fixed: workflow moved to .github/workflows/ (was .github/, so it never ran), Python bumped to 3.12 to match requires-python.
 
-
-## Project scope (locked)
-1. **Phase 1 — Ingestion - DONE - (3 days):** Kaggle dump → DuckDB schema → benchmark_subset selection → API fetcher → LaTeX extractor.
-2. **Phase 2a — CRNN from scratch (5-6 days):** CNN + BiLSTM + CTC, hand-derived forward-backward CTC pass.
-3. **Phase 2b — OCR benchmark (5-6 days):** Chandra-2 + Marker + Nougat + olmOCR + Nemotron-OCR-v2 + CRNN baseline. Evaluated on OlmOCRBench (field-standard) AND ~900 arXiv papers with LaTeX-source ground truth.
-4. **Phase 3 — Metadata extraction → markdown corpus (2-3 days):** Pydantic + instructor structured output. Reuse HF's 27k Chandra corpus for scale; produce 2k via own pipeline as validation.
-5. **Phase 4 — Streamlit demo (2 days):** Upload PDF → OCR → markdown + metadata.
-6. **Phase 5 — Knowledge graph (3-4 days):** Citation extraction, NetworkX, gap-signal heuristics.
-7. **Phase 6 — GPT-from-scratch PoC (5-6 days):** ~30M params, BPE from scratch, training loop. Pretrain on subset of HF corpus. SFT on small instruction set. Pedagogical, framed as such.
-8. **Phase 7 — Production RAG (4-5 days):** Chunking ablation, embeddings, Qdrant or ChromaDB, retrieval eval (Recall@k, MRR, RAGAS). Local generation via Ollama with 4-bit quantized 7-14B model.
-9. **Phase 8 — Polish (ongoing + 2 days):** Per-phase blog posts, README, architecture diagram, demo video.
+## Project scope (locked) — v2, 2026-06-10
+ 
+Replan after external review: cut to the critical path that delivers the actual
+goal (a queryable scientific knowledge base with an intelligence layer).
+Deferred items move to Phase 7 (parked), not deleted.
+ 
+1. **Phase 2 — Pipeline state & idempotency (2-3 days):** DuckDB becomes the single source of truth AND the working journal. `pipeline_runs` (one row per script execution: stage, config JSON, git sha, outcome) + `paper_stage_state` (one row per paper × stage: done/failed, artifact path, detail JSON). All stage scripts select work from the DB, write artifacts atomically (tmp + os.replace), record outcome last. Backfill from existing `papers.pdf_path` / `source_path` and any OCR markdown already on disk. Refactor `run_ocr.py` to this pattern; fetcher migrates later (same helpers).
+2. **Phase 3 — OCR corpus (2-3 days):** Finish Chandra-2/vLLM run on ~900 papers with truncation flags (`tokens >= max_output_tokens` recorded per page). In parallel, pull the HF 27k Chandra corpus to bootstrap the RAG — own pipeline serves as validation, not the bottleneck.
+3. **Phase 4 — Chunking + vector store (4-5 days):** Markdown-aware chunker (header boundaries, tables/equations kept intact, ~512-1024 tokens, title + section path prepended). `chunks` table in DuckDB (lineage: chunker version, text hash, run_id). Qdrant as a Docker service: dense + sparse vectors (BGE-M3), payload = {arxiv_id, section, page, category, published_date}. Golden eval set (~50 question → relevant-chunk pairs) BEFORE tuning. Retrieval eval: Recall@k, MRR. Timebox the chunking ablation to 1 day.
+4. **Phase 5 — Agent layer (4-5 days):** LLM with tools over both stores: `sql_query` (DuckDB: trends, filters, counts), `vector_search` (Qdrant: hybrid + reranker), `get_paper` (full markdown), `get_repo` (GitHub URLs from Phase 1 extraction). Local generation via Ollama/vLLM. RAGAS for end-to-end eval.
+5. **Phase 6 — Intelligence layer (3-4 days):** Weekly job: Kaggle dump delta → embed new abstracts → score against interest profile (seed queries/papers) → novelty-ranked digest with arXiv + repo links. Expose the agent as an MCP server so coding agents can query the corpus while building.
+6. **Phase 7 — Parked:** OCR benchmark (OlmOCRBench, 5 engines), knowledge graph enrichment (Semantic Scholar venue resolution, citation edges), Streamlit demo, GPT-from-scratch (→ separate pedagogical repo).
+7. **Phase 8 — Polish (ongoing):** per-phase blog posts, README quickstart, architecture diagram, demo video.
 
 ### Phase 1 talking points:
 "Evaluated three ingestion paths, picked the hybrid that fit the data scale."
@@ -100,10 +108,12 @@ S3 requester-pays bucket considered and rejected: ~$100 + 1.1TB for content we d
 - NEW: Phase 2a math depth. CTC derivation requires solid grasp of dynamic programming + log-space arithmetic. Daily math exercises in progress; if math feels shaky after Day 2, take a math-only day before continuing.
 
 ## Open questions
-- bioRxiv ingestion in Phase 1: in v2
-- Vector DB choice in Phase 7: Qdrant vs. ChromaDB. Decide at Phase 7 entry.
-- Phase 2a backward-pass implementation vs. derivation-only: decide at end of Day 2 based on math comfort.
-- Phase 2a beam search: decide at Day 10 based on time remaining.
+- BGE-M3 VRAM fit next to vLLM/Ollama on 16 GB — validate at Phase 4 entry; fallback: smaller dense model + Qdrant-side BM25 sparse.
+- Chunk text storage: in the DuckDB `chunks` table (ground truth, simple) vs files + hash only. Leaning DuckDB; decide at Phase 4 entry.
+- Reranker: bge-reranker (already in deps) vs none — measure on golden set before adding latency.
+- Fetcher migration to paper_stage_state helpers: do when next ingestion batch is needed (10-line change, not urgent).
+- Interest profile representation (Phase 6): seed queries vs seed-paper centroids vs both.
+- bioRxiv ingestion: still v2.
 
 ## Phase 1 artifacts (for reference)
 src/scirex/ingestion/fetch_files.py — async-free fetcher with tenacity retries
