@@ -19,7 +19,7 @@ jobs:
           python-version: "3.12"
           enable-cache: true
 
-      - name Check lockfile is in sync with pyproject.toml
+      - name: Check lockfile is in sync with pyproject.toml
         run: uv lock --check  
 
       - name: Install package + dev deps
