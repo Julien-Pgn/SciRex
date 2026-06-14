@@ -16,6 +16,7 @@ authors = [
 # einops, pydantic, networkx, pillow, matplotlib, rich, requests, httpx, tqdm,
 # pytest, jupyter, ipykernel, tensorboard, typer-slim, beautifulsoup4, uv.
 # DO NOT redeclare these here — pip would fight the container's builds.
+
 dependencies = [
     # Config & logging
     "pydantic-settings>=2",
@@ -68,7 +69,7 @@ ocr = [
     "python-Levenshtein",
     "lxml",
     "easyocr",
-    "chandra-ocr[hf]",
+    "chandra-ocr",
 ]
 
 llm = [
