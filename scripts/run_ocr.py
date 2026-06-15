@@ -34,9 +34,11 @@ logger = logging.getLogger(__name__)
 def process_one_pdf(pdf_path, i, total, output_dir):
     """Process a single PDF: skip if done, otherwise OCR and save."""
     output_path = output_path_for(pdf_path, output_dir)
+    arxiv_id = pdf.path.stem  # Assuming the PDF filename is the arxivid.pdf 
     if output_path.exists():
         return f"[{i}/{total}] Skipping {pdf_path.name} (already done)"
     try:
+        arxiv_id = pdf.path.stem  # Assuming the PDF filename is the arxivid.pdf 
         pages = pdf_to_images(pdf_path)
         md, stats = images_to_markdown(pages)
         saved_path = save_markdown(md, pdf_path, output_dir)
