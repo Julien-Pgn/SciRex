@@ -6,18 +6,18 @@ Failures per paper are logged but do not stop the run.
 Resumable: re-running skips papers whose `pdf_path` is already set in `papers`.
 
 Usage:
-    python -m scirex.ingestion.fetch_files
+    python -m scirex.ingestion.fetch_files --table benchmark_subset
 """
-
+import argparse
 import logging
 import time
+import traceback
 from pathlib import Path
-
-import argparse
+from typing import Optional
 
 import duckdb
 import requests
-from requests.exceptions import RequestException
+from requests.exceptions import RequestException, HTTPError
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -26,19 +26,18 @@ from tenacity import (
 )
 
 # Configuration
-
-DB_PATH = "data/arxiv_metadata.duckdb"
+DB_PATH = Path("data/arxiv_metadata.duckdb")
 PDF_DIR = Path("data/raw/pdfs")
 SRC_DIR = Path("data/raw/sources")
 LOG_DIR = Path("data/logs")
 
-# Polite identifier — arXiv asks API users to identify themselves.
+# Polite identifier — arXiv asks API users to identify themselves
 HEADERS = {"User-Agent": "SciRex/0.1 (https://github.com/Julien-Pgn/scirex)"}
 
-# Pause between papers (arXiv asks for >= 3s between requests).
+# Pause between papers (arXiv asks for >= 3s between requests)
 SLEEP_BETWEEN_PAPERS = 3
 
-# Shared retry policy for any HTTP-flavored I/O against arXiv.
+# Shared retry policy for any HTTP-flavored I/O against arXiv
 HTTP_RETRY = retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=2, min=2, max=10),
@@ -81,6 +80,7 @@ def fetch_source(arxiv_id: str, output_dir: Path) -> Path:
 # Get the list of ArXiv papers to dowload
 def get_papers_to_fetch(conn: duckdb.DuckDBPyConnection, table: str) -> list[str]:
     """Return arxiv_ids from 'table' whose pdf_path is still NULL in paper_local."""
+
     rows = conn.execute(f"""
         SELECT s.arxiv_id
         FROM {table} s
@@ -91,19 +91,19 @@ def get_papers_to_fetch(conn: duckdb.DuckDBPyConnection, table: str) -> list[str
     return [row[0] for row in rows]
 
 # Update the db with the paths of the fetched files when done
-def update_paper_paths(conn: duckdb.DuckDBPyConnection, arxiv_id: str, pdf_path: Path, source_path: Path) -> None:
-    """Mark a paper as fetched by writing its file paths into the papers table."""
+def update_paper_paths(conn: duckdb.DuckDBPyConnection, arxiv_id: str, pdf_path: Path, source_path: Path, table: str) -> None:
+    """Mark a paper as fetched by writing its file paths into the paper_local table."""
     conn.execute(
         """
-        INSERT INTO paper_local (arxiv_id, pdf_path, latex_source_path)
-        VALUES (?, ?, ?)
+        INSERT INTO paper_local (arxiv_id, pdf_path, latex_source_path, ocr_reason)
+        VALUES (?, ?, ?, ?)
         ON CONFLICT (arxiv_id) DO UPDATE SET
             pdf_path = EXCLUDED.pdf_path,
-            latex_source_path = EXCLUDED.latex_source_path
+            latex_source_path = EXCLUDED.latex_source_path,
+            ocr_reason = EXCLUDED.ocr_reason
         """,
-        [arxiv_id, str(pdf_path), str(source_path)],   
+        [arxiv_id, str(pdf_path), str(source_path), str(table)],  
     )
-
 
 # Main loop:
 def main() -> None:
@@ -113,17 +113,19 @@ def main() -> None:
     parser.add_argument(
         "--table",
         required=True ,
-        help="Table DuckDB listing all papers to download (default: 'subset')",
+        help="DuckDB table listing all papers to download (must exist in the database).",
     )
-    args = parser.parse_args()
+    args: argparse.Namespace = parser.parse_args()
 
     # Security
     if not args.table.isidentifier():
         raise ValueError(f"Invalid table name: {args.table}")
 
+    # Create all necessary directories if they don't exist yet
     for d in (PDF_DIR, SRC_DIR, LOG_DIR):
         d.mkdir(parents=True, exist_ok=True)
 
+    # Configure logging
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
@@ -138,9 +140,7 @@ def main() -> None:
 
         # Verify that the table exists
         exists = conn.execute("""
-            SELECT 1 FROM information_schema.tables WHERE table_name = ?""", 
-                              [args.table],
-                                ).fetchone() is not None
+            SELECT 1 FROM information_schema.tables WHERE table_name = ?""", [args.table],).fetchone() is not None
         if not exists:
             log.error(f"Table '{args.table}' does not exist in the database. Exiting.")
             raise ValueError(f"Table '{args.table}' does not exist in the database.")
@@ -154,18 +154,17 @@ def main() -> None:
             try:
                 pdf_path = fetch_pdf(arxiv_id, PDF_DIR)
                 source_path = fetch_source(arxiv_id, SRC_DIR)
-                update_paper_paths(conn, arxiv_id, pdf_path, source_path)
+                update_paper_paths(conn, arxiv_id, pdf_path, source_path, args.table)
                 n_ok += 1
                 log.info(f"[{i}/{n}] OK   {arxiv_id}")
             except Exception as e:
                 n_fail += 1
-                log.error(f"[{i}/{n}] FAIL {arxiv_id}: {type(e).__name__}: {e}")
+                log.error(f"[{i}/{n}] FAIL {arxiv_id}: {type(e).__name__}: {e}\n{traceback.format_exc()}")
             time.sleep(SLEEP_BETWEEN_PAPERS)
 
         log.info(f"Done. Success: {n_ok}, Failed: {n_fail}")
 
-        # Loud, human-readable summary that survives `nohup` to the terminal
-        # if you're watching, and is impossible to miss in scrollback.
+        # Prints a summary to the console: for me to monitor progress without opening the log file. 
         total = n_ok + n_fail
         print()
         print("=" * 60)
