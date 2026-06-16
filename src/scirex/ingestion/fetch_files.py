@@ -95,12 +95,12 @@ def update_paper_paths(conn: duckdb.DuckDBPyConnection, arxiv_id: str, pdf_path:
     """Mark a paper as fetched by writing its file paths into the paper_local table."""
     conn.execute(
         """
-        INSERT INTO paper_local (arxiv_id, pdf_path, latex_source_path, ocr_reason)
+        INSERT INTO paper_local (arxiv_id, pdf_path, latex_source_path, keyword_for_ocr)
         VALUES (?, ?, ?, ?)
         ON CONFLICT (arxiv_id) DO UPDATE SET
             pdf_path = EXCLUDED.pdf_path,
             latex_source_path = EXCLUDED.latex_source_path,
-            ocr_reason = EXCLUDED.ocr_reason
+            keyword_for_ocr = EXCLUDED.keyword_for_ocr
         """,
         [arxiv_id, str(pdf_path), str(source_path), str(table)],  
     )
