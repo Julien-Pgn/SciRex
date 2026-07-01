@@ -1,6 +1,6 @@
 # PROJECT.md — SciRex working state
 
-Last updated: 2026-05-01
+Last updated: 2026-07-01
 Repo: github.com/Julien-Pgn/scirex
 
 ## Current phase
@@ -79,6 +79,10 @@ S3 requester-pays bucket considered and rejected: ~$100 + 1.1TB for content we d
 2026-06-10: Embeddings: BGE-M3 (dense + sparse from one model, 8k context) — validate VRAM fit on the 5070 Ti alongside other loads before locking.
 2026-06-10: Bootstrap the RAG with the HF 27k Chandra corpus while own OCR run completes; own 900-paper pipeline is the validation set, not the bottleneck.
 2026-06-10: CI fixed: workflow moved to .github/workflows/ (was .github/, so it never ran), Python bumped to 3.12 to match requires-python.
+2026-06-16: Pivoting the project by recreating the duckdb and tables for regular updates and getting more informations. Modification of the scripts to run the ocr and update the tables when md and html files are saved. 
+2026-06-16: How it works: you select a subset of papers of interest from the papers table and use fetch_files.py to download the pdfs in data/raw then the scripts/run_ocr.py will OCR all the papers found and create new subfolders in data/processed/{arxiv_id}/ to store the md file, the html and all the image for later multimodal RAG. 
+2026-07-01: the initial paper selection is not precise so I need to do a hybrid search that combines a keyword and semantic meaning followed by reranking. Then OCR and the proper RAG. 
+
 
 ## Project scope (locked) — v2, 2026-06-10
  
@@ -101,7 +105,7 @@ Deferred items move to Phase 7 (parked), not deleted.
 "92% LaTeX-source extraction rate on cs.* papers = OCR ground truth."
 
 ## Known risks
-- bitsandbytes for sm_120 — installed but not yet exercised. DOesn't work with CUDA 13 - use torchao instead.
+- bitsandbytes for sm_120 — installed but not yet exercised. Doesn't work with CUDA 13 - use torchao instead.
 - ragas + langchain-community installed; potential conflict if transformers upgraded.
 - Chandra-2 weights ~5B — 8-bit quantization works on RTX 5070Ti with 16 GB VRAM.
 - TurboQuant (Google KV-cache compression) flagged for Phase 7 if VRAM becomes binding.
