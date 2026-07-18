@@ -20,7 +20,7 @@ jobs:
           enable-cache: true
           
       - name: Install package + dev deps
-        run: uv pip install --system -e ".[dev]" duckdb
+        run: uv pip install --system -e ".[dev]" duckdb chandra-ocr
 
       - name: Lint (ruff)
         run: ruff check src tests scripts

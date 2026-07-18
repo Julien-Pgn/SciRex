@@ -8,16 +8,16 @@ Resumable: re-running skips papers whose `pdf_path` is already set in `papers`.
 Usage:
     python -m scirex.ingestion.fetch_files --table benchmark_subset
 """
+
 import argparse
 import logging
 import time
 import traceback
 from pathlib import Path
-from typing import Optional
 
 import duckdb
 import requests
-from requests.exceptions import RequestException, HTTPError
+from requests.exceptions import RequestException
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -61,6 +61,7 @@ def fetch_pdf(arxiv_id: str, output_dir: Path) -> Path:
 
     return pdf_path
 
+
 # Fetch the LaTeX source tarballs
 @HTTP_RETRY
 def fetch_source(arxiv_id: str, output_dir: Path) -> Path:
@@ -90,8 +91,11 @@ def get_papers_to_fetch(conn: duckdb.DuckDBPyConnection, table: str) -> list[str
     """).fetchall()
     return [row[0] for row in rows]
 
+
 # Update the db with the paths of the fetched files when done
-def update_paper_paths(conn: duckdb.DuckDBPyConnection, arxiv_id: str, pdf_path: Path, source_path: Path, table: str) -> None:
+def update_paper_paths(
+    conn: duckdb.DuckDBPyConnection, arxiv_id: str, pdf_path: Path, source_path: Path, table: str
+) -> None:
     """Mark a paper as fetched by writing its file paths into the paper_local table."""
     conn.execute(
         """
@@ -102,8 +106,9 @@ def update_paper_paths(conn: duckdb.DuckDBPyConnection, arxiv_id: str, pdf_path:
             latex_source_path = EXCLUDED.latex_source_path,
             keyword_for_ocr = EXCLUDED.keyword_for_ocr
         """,
-        [arxiv_id, str(pdf_path), str(source_path), str(table)],  
+        [arxiv_id, str(pdf_path), str(source_path), str(table)],
     )
+
 
 # Main loop:
 def main() -> None:
@@ -112,7 +117,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Fetch PDFs/LaTeX for a subset table.")
     parser.add_argument(
         "--table",
-        required=True ,
+        required=True,
         help="DuckDB table listing all papers to download (must exist in the database).",
     )
     args: argparse.Namespace = parser.parse_args()
@@ -137,10 +142,15 @@ def main() -> None:
     log = logging.getLogger(__name__)
 
     with duckdb.connect(DB_PATH) as conn:
-
         # Verify that the table exists
-        exists = conn.execute("""
-            SELECT 1 FROM information_schema.tables WHERE table_name = ?""", [args.table],).fetchone() is not None
+        exists = (
+            conn.execute(
+                """
+            SELECT 1 FROM information_schema.tables WHERE table_name = ?""",
+                [args.table],
+            ).fetchone()
+            is not None
+        )
         if not exists:
             log.error(f"Table '{args.table}' does not exist in the database. Exiting.")
             raise ValueError(f"Table '{args.table}' does not exist in the database.")
@@ -159,16 +169,18 @@ def main() -> None:
                 log.info(f"[{i}/{n}] OK   {arxiv_id}")
             except Exception as e:
                 n_fail += 1
-                log.error(f"[{i}/{n}] FAIL {arxiv_id}: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+                log.error(
+                    f"[{i}/{n}] FAIL {arxiv_id}: {type(e).__name__}: {e}\n{traceback.format_exc()}"
+                )
             time.sleep(SLEEP_BETWEEN_PAPERS)
 
         log.info(f"Done. Success: {n_ok}, Failed: {n_fail}")
 
-        # Prints a summary to the console: for me to monitor progress without opening the log file. 
+        # Prints a summary to the console: for me to monitor progress without opening the log file.
         total = n_ok + n_fail
         print()
         print("=" * 60)
-        print(f"  FETCH RUN COMPLETE")
+        print("  FETCH RUN COMPLETE")
         print("=" * 60)
         print(f"  Total attempted:  {total}")
         print(f"  Successful:       {n_ok}")

@@ -12,7 +12,6 @@ from pathlib import Path
 
 import duckdb
 
-
 # Configuration
 DB_PATH = "data/arxiv_metadata.duckdb"
 SRC_DIR = Path("data/raw/sources")

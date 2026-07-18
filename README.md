@@ -7,10 +7,14 @@ A PDF-to-markdown knowledge pipeline to build RAG databases for AI query on scie
 ## What this project is
 
 A general pipeline for turning PDFs into a queryable knowledge base, using
-scientific literature as a case study. Contributions:
+scientific literature as a case study.
 
-- **Metadata extraction** via structured LLM output into per-paper markdown.
-- **Knowledge graph + RAG** over the resulting corpus, with a locally-hosted LLM.
+**Working today:**
+- **Ingestion** — arXiv metadata into DuckDB, PDF/LaTeX-source fetching, LaTeX extraction.
+- **OCR** — PDF-to-markdown conversion via Chandra/vLLM, with per-page stats tracked in DuckDB.
+
+**Planned, not yet implemented** (see `ROADMAP.md`): chunking + vector store,
+retrieval-augmented agent layer over a locally-hosted LLM, knowledge graph.
 
 ## Quickstart
 
