@@ -4963,7 +4963,6 @@ dependencies = [
 all = [
     { name = "accelerate" },
     { name = "altair" },
-    { name = "beautifulsoup4" },
     { name = "bitsandbytes" },
     { name = "chandra-ocr" },
     { name = "chromadb" },
@@ -5029,7 +5028,6 @@ llm = [
     { name = "transformers" },
 ]
 ocr = [
-    { name = "beautifulsoup4" },
     { name = "chandra-ocr" },
     { name = "easyocr" },
     { name = "editdistance" },
@@ -5064,7 +5062,6 @@ requires-dist = [
     { name = "accelerate", marker = "extra == 'llm'" },
     { name = "altair", marker = "extra == 'demo'" },
     { name = "arxiv" },
-    { name = "beautifulsoup4", marker = "extra == 'ocr'", specifier = ">=4.14.2" },
     { name = "bitsandbytes", marker = "extra == 'llm'" },
     { name = "chandra-ocr", marker = "extra == 'ocr'" },
     { name = "chromadb", marker = "extra == 'rag'" },

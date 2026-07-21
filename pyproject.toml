@@ -90,6 +90,7 @@ graph = [
 
 rag = [
     "sentence-transformers",
+    "FlagEmbedding",
     "qdrant-client",
     "chromadb",
     "rank-bm25",
