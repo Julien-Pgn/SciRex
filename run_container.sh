@@ -3,7 +3,8 @@
 # Usage: ./run_container.sh <mode> [args...]
 # Modes:
 #   shell                         interactive bash inside the container (default)
-#   exec <cmd> [args...]          run a single command, e.g. exec pytest
+#   exec [--gpus all] <cmd> [args...]   run a single command, e.g. exec pytest
+#                                        (add --gpus all right after exec for GPU access)
 #   jupyter                       start JupyterLab on http://localhost:8888 (detached)
 #   streamlit                     start Streamlit demo on http://localhost:8501 (detached)
 #   stop <jupyter|streamlit>      stop and remove a daemon
@@ -47,11 +48,16 @@ case "$mode" in
     # "exec" allows you to run a single command inside the container without starting an interactive shell, e.g. "./run_container.sh exec pytest"
     exec)
         shift
+        gpu_flag=()
+        if [ "${1:-}" = "--gpus" ]; then
+            gpu_flag=(--gpus "$2")
+            shift 2
+        fi
         if [ $# -eq 0 ]; then
             echo "exec requires a command, e.g. ./run_container.sh exec pytest" >&2
             exit 1
         fi
-        docker run --rm "${COMMON_FLAGS[@]}" "$IMAGE" "$@"
+        docker run --rm "${gpu_flag[@]}" "${COMMON_FLAGS[@]}" "$IMAGE" "$@"
         ;;
 
     # "jupyter" starts JupyterLab in detached mode, mapping port 8888 to the host. It also sets up Jupyter with no token or password for easy access. Logs can be viewed with "./run_container.sh logs jupyter" and the container can be stopped with "./run_container.sh stop jupyter".
