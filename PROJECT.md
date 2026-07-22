@@ -87,6 +87,52 @@ S3 requester-pays bucket considered and rejected: ~$100 + 1.1TB for content we d
 2026-07-22: corpus curation should happen on abstracts already in the duck db
 2026-07-22: hybrid serach combining dense and sparse embeddings using BGE-M3 is the best approach to find all relevant papers (precision at 0.7 and recall at 0.7) -> classifying using a local LLM (Qwen2.5-7B-Instruct) increases precision up to 0.82 with a recall to 0.82 which validates the two stage approach. 
 
+### Phase 3.5 — Topic retrieval (validated, ready to build)
+
+**Problem:** regex-based paper selection (`genai_subset`) had poor precision and recall for
+topic-specific corpus curation — spot-checked sample showed most matches were topic-adjacent, not
+topic-relevant.
+
+**Validated approach** (prototype: `notebooks/topic_retrieval.ipynb`, test topic: "quantization"):
+1. Embed paper abstracts (already in DuckDB `papers.abstract` for all 3.07M rows — no fetch/OCR
+   needed) with BGE-M3, producing dense + sparse (lexical) vectors from one model call.
+2. Hybrid search: fuse dense + sparse rankings via Reciprocal Rank Fusion (RRF). Beats dense-only
+   retrieval (AP 0.866 vs 0.767 on an 85-paper hand-labeled golden set).
+3. LLM classification pass over hybrid's candidates: local Qwen2.5-7B-Instruct (int8 via torchao),
+   rubric + few-shot prompt (examples pulled from the golden set, encoding real confusions found
+   during labeling: "uncertainty quantification," "vector quantization"/VQ-VAE, papers that only
+   evaluate already-quantized models). Measurably improves precision over hybrid alone at matched
+   recall: 0.82 vs 0.74 precision at recall=0.82.
+4. Two-stage architecture: hybrid = recall engine (wide net), LLM classifier = precision cleanup.
+
+**Hard constraint:** 100% local — no cloud APIs. BGE-M3 and the classifier LLM both run on-device
+(RTX 5070 Ti, 16GB VRAM). DuckDB is the only datastore for this stage — not Qdrant, which stays
+scoped to Phase 4's post-OCR chunk vectors.
+
+**Next steps to productionize:**
+1. Extract `rrf_fuse` + hybrid/dense scoring from the notebook into `src/scirex/retrieval/hybrid_search.py`
+   — pure functions, unit-testable without GPU/DB, same style as `tests/test_ocr_pipeline.py`.
+2. Extract embedding + classification calls into `src/scirex/retrieval/embed.py` and `classify.py`.
+3. New DuckDB tables:
+   - `abstract_embeddings(arxiv_id PK, dense_vec, sparse_weights, embed_model, embed_date)` —
+     populated once per category slice; idempotent (embed only un-embedded papers on rerun).
+   - `topic_subset(topic, arxiv_id, hybrid_score, llm_verdict, rank, run_id, created_at)` —
+     replaces one-off tables like `genai_subset`; reusable across topics.
+4. Two scripts, matching the existing `fetch_files.py`/`run_ocr.py` pattern exactly (argparse CLI,
+   dual file+stderr logging, summary banner, idempotent via DB state — not filesystem checks):
+   - `scripts/embed_abstracts.py` — batch-embeds a category-filtered slice into `abstract_embeddings`.
+   - `scripts/search_topic.py` — takes `--topic`/`--query`, runs hybrid search + LLM classification,
+     writes results to `topic_subset`.
+5. Wire into the existing flow: `fetch_files.py` needs a small `WHERE topic = ?` filter added since
+   `topic_subset` is now shared across topics; `run_ocr.py --keyword <topic>` works close to unchanged.
+6. For each *new* topic: build a small labeled golden set first (broad keyword net for candidate
+   positives, deliberate hard negatives for likely lexical confusions, manual review) before trusting
+   results — same methodology validated here, not a one-off for "quantization" only.
+
+**Known open decisions for the build:** exact DuckDB column types for the embedding table (array vs.
+JSON for sparse weights, whether to use the `vss` extension for indexing) weren't settled — decide
+when writing that table's DDL, not before.
+
 ## Project scope (locked) — v2, 2026-06-10
  
 Replan after external review: cut to the critical path that delivers the actual
