@@ -79,16 +79,38 @@ def fetch_source(arxiv_id: str, output_dir: Path) -> Path:
 
 
 # Get the list of ArXiv papers to dowload
-def get_papers_to_fetch(conn: duckdb.DuckDBPyConnection, table: str) -> list[str]:
-    """Return arxiv_ids from 'table' whose pdf_path is still NULL in paper_local."""
+def get_papers_to_fetch(
+    conn: duckdb.DuckDBPyConnection, table: str, topic: str | None = None
+) -> list[str]:
+    """Return arxiv_ids from 'table' whose pdf_path is still NULL in paper_local.
 
-    rows = conn.execute(f"""
-        SELECT s.arxiv_id
-        FROM {table} s
-        LEFT JOIN paper_local pl USING (arxiv_id)
-        WHERE pl.pdf_path IS NULL
-        ORDER BY s.arxiv_id
-    """).fetchall()
+    When `topic` is given, `table` is treated as a shared multi-topic table
+    (like topic_subset, which holds every topic's classified candidates in one
+    table): only rows matching that topic AND llm_verdict = TRUE are eligible —
+    topic_subset holds every candidate the LLM screened, not just the ones it
+    confirmed relevant.
+    """
+    if topic is not None:
+        rows = conn.execute(
+            f"""
+            SELECT s.arxiv_id
+            FROM {table} s
+            LEFT JOIN paper_local pl USING (arxiv_id)
+            WHERE pl.pdf_path IS NULL
+              AND s.topic = ?
+              AND s.llm_verdict = TRUE
+            ORDER BY s.arxiv_id
+            """,
+            [topic],
+        ).fetchall()
+    else:
+        rows = conn.execute(f"""
+            SELECT s.arxiv_id
+            FROM {table} s
+            LEFT JOIN paper_local pl USING (arxiv_id)
+            WHERE pl.pdf_path IS NULL
+            ORDER BY s.arxiv_id
+        """).fetchall()
     return [row[0] for row in rows]
 
 
@@ -119,6 +141,13 @@ def main() -> None:
         "--table",
         required=True,
         help="DuckDB table listing all papers to download (must exist in the database).",
+    )
+    parser.add_argument(
+        "--topic",
+        default=None,
+        help="Optional: filter --table to one topic, for shared multi-topic tables like "
+        "topic_subset (only llm_verdict = TRUE rows for this topic are fetched). "
+        "Omit for single-topic tables like benchmark_subset.",
     )
     args: argparse.Namespace = parser.parse_args()
 
@@ -155,16 +184,20 @@ def main() -> None:
             log.error(f"Table '{args.table}' does not exist in the database. Exiting.")
             raise ValueError(f"Table '{args.table}' does not exist in the database.")
 
-        arxiv_ids = get_papers_to_fetch(conn, args.table)
+        arxiv_ids = get_papers_to_fetch(conn, args.table, topic=args.topic)
         n = len(arxiv_ids)
         log.info(f"Starting fetch run: {n} papers to download")
+
+        # keyword_for_ocr should record the actual topic (e.g. "quantization"), not the
+        # shared table name ("topic_subset"), so run_ocr.py --keyword stays meaningful.
+        keyword = args.topic if args.topic else args.table
 
         n_ok, n_fail = 0, 0
         for i, arxiv_id in enumerate(arxiv_ids, start=1):
             try:
                 pdf_path = fetch_pdf(arxiv_id, PDF_DIR)
                 source_path = fetch_source(arxiv_id, SRC_DIR)
-                update_paper_paths(conn, arxiv_id, pdf_path, source_path, args.table)
+                update_paper_paths(conn, arxiv_id, pdf_path, source_path, keyword)
                 n_ok += 1
                 log.info(f"[{i}/{n}] OK   {arxiv_id}")
             except Exception as e:

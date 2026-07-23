@@ -13,6 +13,7 @@ os.environ.setdefault("VLLM_MODEL_NAME", "chandra")
 
 # Import the functions from the pipeline module
 from scirex.ocr.modern.pipeline import (
+    get_pdf_paths_for_keyword,
     make_paper_dir,
     ocr_images,
     pdf_to_images,
@@ -72,16 +73,14 @@ def main():
     # 1. Parse arguments
     parser = argparse.ArgumentParser(description="Batch OCR PDFs with Chandra.")
     parser.add_argument(
-        "--input-dir", type=Path, default=Path("data/raw/pdfs"), help="Folder containing PDFs."
-    )
-    parser.add_argument(
         "--db", type=Path, default=Path("data/arxiv_metadata.duckdb"), help="DuckDB database file."
     )
     parser.add_argument(
         "--keyword",
         type=str,
         required=True,
-        help="Topic/subset of this batch (stored in paper_local.keyword_for_ocr).",
+        help="Topic to OCR: selects PDFs from paper_local where keyword_for_ocr matches "
+        "(set by fetch_files.py --topic) — not everything sitting in the shared PDF folder.",
     )
     parser.add_argument(
         "--limit",
@@ -97,15 +96,15 @@ def main():
     )
     args = parser.parse_args()
 
-    # 2. List the PDFs
-    pdf_paths = sorted(args.input_dir.glob("*.pdf"))
-    if args.limit:
-        pdf_paths = pdf_paths[: args.limit]
-    logger.info(f"Found {len(pdf_paths)} PDFs in {args.input_dir}")
-
-    # 3. Process PDFs in parallel
+    # 2. Process PDFs in parallel
     conn = duckdb.connect(str(args.db))
     try:
+        # List the PDFs for this keyword only, from the DB — not a directory glob
+        pdf_paths = sorted(get_pdf_paths_for_keyword(conn, args.keyword))
+        if args.limit:
+            pdf_paths = pdf_paths[: args.limit]
+        logger.info(f"Found {len(pdf_paths)} PDFs for keyword '{args.keyword}'")
+
         # OCR in parallel (workers), writing DB in series (principal thread).
         with ThreadPoolExecutor(max_workers=args.max_concurrent_pdfs) as executor:
             futures = [

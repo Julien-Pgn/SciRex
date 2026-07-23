@@ -204,6 +204,20 @@ def save_all(paper_dir: Path, arxiv_id: str, html, md, images):
     atomic_write_text(paper_dir / f"{arxiv_id}.md", md)
 
 
+def get_pdf_paths_for_keyword(conn, keyword: str) -> list[Path]:
+    """Return PDF paths for papers fetched under this topic (paper_local.keyword_for_ocr).
+
+    This is what makes run_ocr.py safe to point at data/raw/pdfs/, a folder shared
+    across every topic: without this filter, OCR would process every topic's
+    backlog sitting in that directory, not just the one --keyword asks for.
+    """
+    rows = conn.execute(
+        "SELECT pdf_path FROM paper_local WHERE keyword_for_ocr = ? AND pdf_path IS NOT NULL",
+        [keyword],
+    ).fetchall()
+    return [Path(row[0]) for row in rows]
+
+
 def update_db(
     conn,
     arxiv_id,

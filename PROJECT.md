@@ -87,7 +87,7 @@ S3 requester-pays bucket considered and rejected: ~$100 + 1.1TB for content we d
 2026-07-22: corpus curation should happen on abstracts already in the duck db
 2026-07-22: hybrid serach combining dense and sparse embeddings using BGE-M3 is the best approach to find all relevant papers (precision at 0.7 and recall at 0.7) -> classifying using a local LLM (Qwen2.5-7B-Instruct) increases precision up to 0.82 with a recall to 0.82 which validates the two stage approach. 
 
-### Phase 3.5 — Topic retrieval (validated, ready to build)
+### Phase 3.5 — Topic retrieval (built, first production run complete — 2026-07-23)
 
 **Problem:** regex-based paper selection (`genai_subset`) had poor precision and recall for
 topic-specific corpus curation — spot-checked sample showed most matches were topic-adjacent, not
@@ -109,29 +109,71 @@ topic-relevant.
 (RTX 5070 Ti, 16GB VRAM). DuckDB is the only datastore for this stage — not Qdrant, which stays
 scoped to Phase 4's post-OCR chunk vectors.
 
-**Next steps to productionize:**
-1. Extract `rrf_fuse` + hybrid/dense scoring from the notebook into `src/scirex/retrieval/hybrid_search.py`
-   — pure functions, unit-testable without GPU/DB, same style as `tests/test_ocr_pipeline.py`.
-2. Extract embedding + classification calls into `src/scirex/retrieval/embed.py` and `classify.py`.
-3. New DuckDB tables:
-   - `abstract_embeddings(arxiv_id PK, dense_vec, sparse_weights, embed_model, embed_date)` —
-     populated once per category slice; idempotent (embed only un-embedded papers on rerun).
-   - `topic_subset(topic, arxiv_id, hybrid_score, llm_verdict, rank, run_id, created_at)` —
-     replaces one-off tables like `genai_subset`; reusable across topics.
-4. Two scripts, matching the existing `fetch_files.py`/`run_ocr.py` pattern exactly (argparse CLI,
-   dual file+stderr logging, summary banner, idempotent via DB state — not filesystem checks):
-   - `scripts/embed_abstracts.py` — batch-embeds a category-filtered slice into `abstract_embeddings`.
-   - `scripts/search_topic.py` — takes `--topic`/`--query`, runs hybrid search + LLM classification,
-     writes results to `topic_subset`.
-5. Wire into the existing flow: `fetch_files.py` needs a small `WHERE topic = ?` filter added since
-   `topic_subset` is now shared across topics; `run_ocr.py --keyword <topic>` works close to unchanged.
-6. For each *new* topic: build a small labeled golden set first (broad keyword net for candidate
-   positives, deliberate hard negatives for likely lexical confusions, manual review) before trusting
-   results — same methodology validated here, not a one-off for "quantization" only.
+**Built (2026-07-22/23):**
+- `src/scirex/retrieval/hybrid_search.py` — pure `dense_scores`/`sparse_scores`/`rrf_fuse`/
+  `recommend_top_k`, no model/DB imports, unit-tested without GPU.
+- `src/scirex/retrieval/embed.py`, `classify.py` — BGE-M3 and Qwen2.5-7B-Instruct wrappers; heavy
+  imports (FlagEmbedding/transformers/torchao) are lazy, loaded only inside the functions that need
+  them, so the rest of each module (batching, DB I/O, prompt construction, verdict parsing) is
+  testable without GPU/torch installed at all.
+- DDL: `abstract_embeddings(arxiv_id PK, dense_vec FLOAT[1024], sparse_weights MAP(INTEGER, FLOAT),
+  embed_model, embed_date)` and `topic_subset(topic, arxiv_id, hybrid_score, llm_verdict, rank,
+  run_id, created_at, PRIMARY KEY(topic, arxiv_id))`. Resolved the open decisions: MAP over JSON for
+  sparse weights (round-trips to a native Python dict via both `fetchone()`/`fetchdf()`, verified
+  empirically); skipped the `vss` extension (brute-force numpy scoring is fast enough at this scale,
+  no ANN index needed for batch topic curation).
+- `scripts/embed_abstracts.py`, `scripts/search_topic.py` — same shape as `fetch_files.py`/
+  `run_ocr.py` (argparse, dual file+stderr logging, summary banner, idempotent via DB state).
+- `fetch_files.py` got the planned `--topic` filter: `get_papers_to_fetch(conn, table, topic=None)`
+  now requires topic match + `llm_verdict = TRUE` when `topic` is given, so `topic_subset`'s mixed
+  verdicts/topics can't silently leak into a fetch run. `keyword_for_ocr` is set to the topic string
+  itself (e.g. `"quantization"`), not the table name, so `run_ocr.py --keyword` stays meaningful.
 
-**Known open decisions for the build:** exact DuckDB column types for the embedding table (array vs.
-JSON for sparse weights, whether to use the `vss` extension for indexing) weren't settled — decide
-when writing that table's DDL, not before.
+**Bug found and fixed during the build:** `save_embeddings`'s first version wrote rows one at a time
+via `executemany`. Row-by-row binding of a 1024-float array + ~100-entry MAP dict measured at
+~20-40s per 500 rows — this was the actual bottleneck in the first production embed run (not the
+GPU, which sat at 0% SM utilization the whole time), compounded by DuckDB's periodic WAL
+auto-checkpoint (a clean ~4-chunk sawtooth in the run's timing was the tell). Fixed with a bulk
+columnar insert (`INSERT ... SELECT FROM df`, DuckDB's native pandas integration): same 500 rows in
+~0.2s, ~100x faster. Also: BGE-M3's `use_fp16=True` means `lexical_weights` dict values come back as
+`numpy.float16`, which DuckDB's MAP binding can't convert (unlike its LIST/array binding, which
+handles fp16 fine via `.tolist()`) — cast explicitly to plain `float`/`int` before insert.
+
+**`recommend_top_k` — recall-based sizing, and a real limitation found in production:** instead of
+guessing a fixed `--top-k`, look up where the golden set's known positives actually rank in the
+*full* corpus ranking (not a re-ranking among just the golden set — RRF fuses on rank, so a paper's
+rank among ~20 curated papers is a different number than its rank among 421k real ones) and return
+the depth needed to catch `--target-recall` of them. On the real "quantization" category slice
+(421,574 papers), with only 20 labeled positives in the golden set and `target_recall=0.97`, this
+came out to `top_k=231,007` — over half the corpus — because at n=20, missing even one positive
+already drops recall to 95%, so the single worst-ranked outlier (a KV-cache-compression paper
+sharing little vocabulary with the query) single-handedly set the cutoff. Not a bug —
+`recommend_top_k` did exactly what it's specified to do — but a real fragility: with a small golden
+set, high recall targets end up dominated by 1-2 outliers rather than being a robust estimate. For
+tonight's production run, overrode with a fixed `--top-k 1000`, chosen to match the existing OCR
+throughput ceiling (~1000 papers/day) rather than derived from the golden set. Follow-up for a
+future session: either enlarge the golden set so percentile-based sizing is statistically stable, or
+make `recommend_top_k` robust to outliers (e.g. cap by percentile of positives instead of requiring
+literally all of them).
+
+**First production run (2026-07-22/23, topic="quantization", run overnight/unattended):**
+- `embed_abstracts.py --categories cs.LG cs.CL cs.AI cs.CV`: embedded all 421,574 papers in these
+  categories (0 missing on verification).
+- `search_topic.py --topic quantization --top-k 1000`: 1000 hybrid-ranked candidates classified,
+  310 verdict=TRUE (~1.8s/paper on the RTX 5070 Ti). Spot-checked: TRUE verdicts are all genuinely
+  about weight/activation quantization; FALSE verdicts correctly exclude the rubric's named
+  look-alikes in the wild ("Pyramid Vector Quantization for LLMs", "An Overview of Uncertainty
+  Quantification Methods for Infinite Neural Networks"), and correctly overrode hybrid search's own
+  #1-ranked candidate ("On Irrelevance of Attributes in Flexible Prediction") as irrelevant — the
+  two-stage architecture validated on real production data, not just the notebook's 85-paper eval set.
+- `fetch_files.py --table topic_subset --topic quantization`: 307/310 PDFs+sources fetched
+  successfully (99%); 3 failed on genuine arXiv-side 404s (not a systemic issue — resumable,
+  re-running the same command will retry just those 3).
+- Deliberately NOT run tonight: `run_ocr.py` — the `chandra-vllm` OCR service wasn't running, and at
+  the established ~1000-papers/day OCR throughput, 310 papers would take multiple hours, well past
+  the session's time budget. Left for a follow-up session.
+- `genai` was explicitly scoped out as a second validation topic for this phase (2026-07-23 decision)
+  — it's a separate, unrelated topic, not a generalization test for this work.
 
 ## Project scope (locked) — v2, 2026-06-10
  

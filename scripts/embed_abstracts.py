@@ -15,7 +15,12 @@ from pathlib import Path
 
 import duckdb
 
-from scirex.retrieval.embed import embed_texts, get_unembedded_abstracts, load_model, save_embeddings
+from scirex.retrieval.embed import (
+    embed_texts,
+    get_unembedded_abstracts,
+    load_model,
+    save_embeddings,
+)
 
 EMBED_MODEL = "BAAI/bge-m3"
 
@@ -37,13 +42,21 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Batch-embed abstracts with BGE-M3.")
     parser.add_argument("--db", type=Path, default=DB_PATH, help="DuckDB database file.")
     parser.add_argument(
-        "--categories", nargs="+", required=True, help="arXiv categories to embed, e.g. cs.LG cs.CL."
+        "--categories",
+        nargs="+",
+        required=True,
+        help="arXiv categories to embed, e.g. cs.LG cs.CL.",
     )
     parser.add_argument("--batch-size", type=int, default=64, help="Texts per model.encode() call.")
     parser.add_argument(
-        "--save-every", type=int, default=500, help="Papers per DB write (crash-resilience granularity)."
+        "--save-every",
+        type=int,
+        default=500,
+        help="Papers per DB write (crash-resilience granularity).",
     )
-    parser.add_argument("--limit", type=int, default=None, help="Optional: embed only the first N papers.")
+    parser.add_argument(
+        "--limit", type=int, default=None, help="Optional: embed only the first N papers."
+    )
     parser.add_argument("--device", type=str, default="cuda:0")
     args = parser.parse_args()
 

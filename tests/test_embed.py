@@ -2,7 +2,12 @@ import duckdb
 import numpy as np
 import pytest
 
-from scirex.retrieval.embed import embed_texts, get_unembedded_abstracts, save_embeddings
+from scirex.retrieval.embed import (
+    embed_texts,
+    get_unembedded_abstracts,
+    load_corpus_slice,
+    save_embeddings,
+)
 
 
 def test_embed_texts_batches_and_concatenates():
@@ -24,7 +29,9 @@ def test_embed_texts_batches_and_concatenates():
 
 
 def test_embed_texts_handles_empty_input():
-    dense, sparse = embed_texts([], lambda batch: {"dense_vecs": np.empty((0, 2)), "lexical_weights": []})
+    dense, sparse = embed_texts(
+        [], lambda batch: {"dense_vecs": np.empty((0, 2)), "lexical_weights": []}
+    )
     assert dense.shape[0] == 0
     assert sparse == []
 
@@ -72,7 +79,9 @@ def test_save_embeddings_casts_numpy_float16_sparse_weights(conn):
     """Regression test: BGE-M3's use_fp16=True means lexical_weights dict values
     come back as numpy.float16, which DuckDB's MAP binding can't convert directly."""
     fp16_sparse = {np.int64(1): np.float16(0.5)}
-    save_embeddings(conn, ["1111.1111"], np.array([[0.1, 0.2, 0.3, 0.4]]), [fp16_sparse], "test-model")
+    save_embeddings(
+        conn, ["1111.1111"], np.array([[0.1, 0.2, 0.3, 0.4]]), [fp16_sparse], "test-model"
+    )
     row = conn.execute(
         "SELECT sparse_weights FROM abstract_embeddings WHERE arxiv_id = '1111.1111'"
     ).fetchone()
@@ -84,6 +93,7 @@ def test_save_embeddings_is_idempotent_on_rerun(conn):
     save_embeddings(conn, ["1111.1111"], np.array([[0.9, 0.9, 0.9, 0.9]]), [{2: 0.9}], "test-model")
     count = conn.execute("SELECT COUNT(*) FROM abstract_embeddings").fetchone()[0]
     assert count == 1
+
 
 def test_load_corpus_slice_joins_embeddings_with_paper_text(conn):
     save_embeddings(conn, ["1111.1111"], np.array([[0.1, 0.2, 0.3, 0.4]]), [{1: 0.5}], "test-model")

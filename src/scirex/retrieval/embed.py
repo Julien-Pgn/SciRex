@@ -41,7 +41,9 @@ def embed_texts(
     return dense, all_sparse
 
 
-def get_unembedded_abstracts(conn: duckdb.DuckDBPyConnection, categories: list[str]) -> pd.DataFrame:
+def get_unembedded_abstracts(
+    conn: duckdb.DuckDBPyConnection, categories: list[str]
+) -> pd.DataFrame:
     """Return arxiv_id/title/abstract for papers in `categories` not yet in abstract_embeddings."""
     placeholders = ", ".join("?" * len(categories))
     return conn.execute(
@@ -64,7 +66,7 @@ def save_embeddings(
     sparse: list[dict[int, float]],
     embed_model: str,
 ) -> None:
-    """Write one row per paper.
+    """Write one row per paper via a bulk columnar insert.
 
     ON CONFLICT DO NOTHING (not DO UPDATE, unlike paper_local): an embedding is
     an immutable fact about a point in time. Re-embedding with a different model
@@ -75,24 +77,29 @@ def save_embeddings(
     sparse dict values come back as numpy.float16 — DuckDB's MAP binding can't
     convert that dtype (unlike its array/LIST binding, which handles fp16 fine
     via .tolist()), so we cast each value to a plain Python float explicitly.
+
+    Bulk "INSERT ... SELECT FROM df" instead of executemany: row-by-row parameter
+    binding of 1024-float arrays + ~100-entry MAP dicts measured at ~20-40s per
+    500 rows (this was the actual bottleneck behind slow embed_abstracts.py runs,
+    not the GPU) — the columnar bulk insert does the same in well under a second.
     """
-    rows = [
-        (
-            arxiv_id,
-            dense_vec.tolist(),
-            {int(token_id): float(weight) for token_id, weight in sparse_weights.items()},
-            embed_model,
-        )
-        for arxiv_id, dense_vec, sparse_weights in zip(arxiv_ids, dense, sparse, strict=True)
-    ]
-    conn.executemany(
-        """
-        INSERT INTO abstract_embeddings (arxiv_id, dense_vec, sparse_weights, embed_model)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT (arxiv_id) DO NOTHING
-        """,
-        rows,
+    df = pd.DataFrame(  # noqa: F841 -- referenced by name in the SQL below (DuckDB replacement scan)
+        {
+            "arxiv_id": arxiv_ids,
+            "dense_vec": [dense_vec.tolist() for dense_vec in dense],
+            "sparse_weights": [
+                {int(token_id): float(weight) for token_id, weight in sparse_weights.items()}
+                for sparse_weights in sparse
+            ],
+            "embed_model": embed_model,
+        }
     )
+    conn.execute("""
+        INSERT INTO abstract_embeddings (arxiv_id, dense_vec, sparse_weights, embed_model)
+        SELECT arxiv_id, dense_vec, sparse_weights, embed_model FROM df
+        ON CONFLICT (arxiv_id) DO NOTHING
+    """)
+
 
 def load_corpus_slice(conn: duckdb.DuckDBPyConnection, categories: list[str]) -> pd.DataFrame:
     """Load every embedded paper in `categories`: arxiv_id, title, abstract, dense_vec, sparse_weights.

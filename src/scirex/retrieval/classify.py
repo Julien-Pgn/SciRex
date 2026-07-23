@@ -13,7 +13,7 @@ import pandas as pd
 def build_few_shot_block(examples: list[tuple[str, str, bool]], abstract_chars: int = 400) -> str:
     """Format labeled (title, abstract, is_relevant) examples for the prompt."""
     return "\n".join(
-        f'Title: {title}\nAbstract: {abstract[:abstract_chars]}\nAnswer: {"yes" if is_relevant else "no"}\n'
+        f"Title: {title}\nAbstract: {abstract[:abstract_chars]}\nAnswer: {'yes' if is_relevant else 'no'}\n"
         for title, abstract, is_relevant in examples
     )
 
@@ -31,7 +31,9 @@ def select_few_shot_examples(
     return pd.concat([positives, negatives])
 
 
-def build_prompt(rubric: str, few_shot_block: str, title: str, abstract: str, abstract_chars: int = 800) -> str:
+def build_prompt(
+    rubric: str, few_shot_block: str, title: str, abstract: str, abstract_chars: int = 800
+) -> str:
     """Assemble the classification prompt: topic-specific rubric + labeled examples + the target paper."""
     return f"""{rubric}
 Examples:

@@ -5,6 +5,7 @@ this module only ranks numbers that already exist. That split is what makes
 these functions testable without a GPU.
 """
 
+import math
 from collections.abc import Callable
 
 import numpy as np
@@ -46,3 +47,36 @@ def rrf_fuse(*score_arrays: np.ndarray, k: int = 60) -> np.ndarray:
         ranks = np.argsort(np.argsort(-scores))  # 0 = best in that channel
         fused += 1.0 / (k + ranks + 1)
     return fused
+
+
+def recommend_top_k(
+    fused_scores: np.ndarray,
+    corpus_arxiv_ids: list[str],
+    golden_arxiv_ids: list[str],
+    golden_labels: list[int],
+    target_recall: float = 0.97,
+) -> int:
+    """How deep into the hybrid ranking to go to catch `target_recall` of the
+    golden set's known-positive papers, instead of guessing a fixed top-k.
+
+    Only golden papers that are actually part of the scored corpus count —
+    anything else is skipped. This has to be their rank in the FULL corpus
+    ranking, not a re-ranking among just the golden set: RRF fuses on rank,
+    so a paper's rank among ~100 curated papers is a different number than
+    its rank among 400,000 real ones, even for the same underlying score.
+    """
+    order_by_score_desc = [corpus_arxiv_ids[i] for i in np.argsort(-fused_scores)]
+    rank_of_id = {arxiv_id: rank for rank, arxiv_id in enumerate(order_by_score_desc)}
+
+    positive_ranks = sorted(
+        rank_of_id[arxiv_id]
+        for arxiv_id, label in zip(golden_arxiv_ids, golden_labels, strict=True)
+        if label == 1 and arxiv_id in rank_of_id
+    )
+    if not positive_ranks:
+        raise ValueError(
+            "None of the golden set's positive papers were found in the scored corpus."
+        )
+
+    n_needed = min(math.ceil(target_recall * len(positive_ranks)), len(positive_ranks))
+    return positive_ranks[n_needed - 1] + 1

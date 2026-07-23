@@ -44,10 +44,12 @@ def test_parse_verdict_ignores_case_and_punctuation():
 
 
 def test_select_few_shot_examples_returns_requested_counts():
-    golden = pd.DataFrame({
-        "title": [f"T{i}" for i in range(10)],
-        "label": [1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-    })
+    golden = pd.DataFrame(
+        {
+            "title": [f"T{i}" for i in range(10)],
+            "label": [1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+        }
+    )
     few_shot = select_few_shot_examples(golden, n_positive=2, n_negative=2)
     assert len(few_shot) == 4
     assert (few_shot["label"] == 1).sum() == 2
