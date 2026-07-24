@@ -216,6 +216,70 @@ label; fine for a single active topic, but worth remembering before assuming "la
 is done.** This corpus (plus the original ~900-paper benchmark set from Phase 3) is what Phase 4
 chunking will consume.
 
+### Phase 4 — Chunking + vector store: next steps (not started — planned 2026-07-24)
+
+**Prerequisite corpus:** any paper with `paper_local.ocr_done = TRUE` — **not** gated on having a
+`topic_subset` row. The original ~900-paper Phase 3 benchmark corpus predates topic tracking
+entirely (no `topic_subset` row at all) but is equally valid, chunkable content. `topic_subset` only
+explains *why* a paper got fetched/OCR'd, not whether it's usable downstream.
+
+**Two open questions from the locked scope below, resolved now (their notes said "decide at Phase 4
+entry" — this is that):**
+1. **Chunk text storage → DuckDB `chunks` table**, not files+hash. Consistent with this project's
+   established pattern (`abstract_embeddings`, `topic_subset`, `paper_local` all live in DuckDB too,
+   not on disk). A `chunks` table already exists as an empty stub from Phase 1
+   (`notebooks/db_build.ipynb`, cell 17): `chunk_id, arxiv_id, chunk_index, char_start, char_end,
+   n_tokens, text, section, embed_model, UNIQUE(arxiv_id, chunk_index)`. Needs 2 more columns for
+   lineage per the locked scope's requirement: `chunker_version`, `run_id`.
+2. **BGE-M3 VRAM fit "next to vLLM/Ollama"** — re-scoped: that's actually a **Phase 5** question
+   (agent generation running *alongside* retrieval at query time), not a Phase 4 one. Phase 4 just
+   batch-embeds chunks with the same load-model → use → free-VRAM pattern already proven in
+   `search_topic.py` — no real concurrency risk here. Revisit at Phase 5 entry instead.
+3. **Reranker (bge-reranker, already in `pyproject.toml`'s `rag` group)** — deliberately left open:
+   build the golden eval set and a baseline retrieval score first (steps 1 and 7 below), then measure
+   with/without the reranker before deciding. Same "evaluate before tuning" discipline the topic
+   retrieval's golden set already established — don't add latency on a hunch.
+
+**Concrete steps, in dependency order (estimate: 4-5 days total, matching the locked-scope estimate):**
+1. **Golden eval set first, before any chunking code** (~0.5-1 day). ~50 question → relevant-chunk
+   pairs, hand-written against real papers already in the corpus (mix of quantization + benchmark
+   papers, so both populations are represented). Same methodology as the topic-retrieval golden set:
+   write it once, store as parquet, reuse it for every tuning decision below so nothing gets tuned by
+   vibes.
+2. **Notebook-prototype the chunker first** (~1 day) — matches this project's established pattern
+   (every phase so far prototyped in `notebooks/` before graduating to `src/scirex/`). Try a
+   markdown-aware splitter on a handful of real `.md` files from `data/processed/`: split on header
+   boundaries, keep tables/equations intact (don't split mid-table or mid-equation), target
+   ~512-1024 tokens per chunk, prepend title + section path to each chunk's text so a chunk read in
+   isolation still carries context. Eyeball a few real chunks before formalizing anything.
+3. **Graduate into `src/scirex/chunking/chunker.py`** (~0.5 day) — pure function(s): markdown text
+   in, list of chunk dicts out (text, section, char_start/end, n_tokens). No DB/model imports,
+   unit-testable — same "pure logic separated from I/O" split already used for `hybrid_search.py`.
+4. **`chunks` table migration + `scripts/chunk_papers.py`** (~1 day) — same shape as
+   `embed_abstracts.py`: idempotent (only chunk papers not yet chunked for the current
+   `chunker_version`, so a future re-chunk with a new version doesn't collide with old chunks), dual
+   file+stderr logging, summary banner.
+5. **Qdrant as a Docker service** (~0.5 day) — new `run_qdrant.sh`, same shape as `run_vllm.sh`,
+   joined to the existing `scirex-net` Docker network so it's reachable by hostname from the dev
+   container, matching how `chandra-vllm` already works.
+6. **`scripts/embed_chunks.py`** (~1 day) — BGE-M3 dense+sparse over chunk text, reusing
+   `src/scirex/retrieval/embed.py`'s patterns, upserting into Qdrant with payload
+   `{arxiv_id, section, page, category, published_date}`. Idempotent, same style as everything else.
+7. **Retrieval eval against the golden set** (~0.5-1 day) — Recall@k, MRR. Run once without a
+   reranker (baseline), then once with `bge-reranker` — keep it only if it measurably helps at
+   acceptable latency. This is where open question 3 above actually gets closed, with data instead
+   of a guess.
+8. **Timebox a chunking ablation to 1 day** (per the locked scope) — if time allows, try 1-2
+   alternate chunk sizes/overlaps against the same golden set, but don't let this expand past a day.
+
+### Phase 5 — Agent layer (after Phase 4): preview, not detailed yet
+LLM with tools over both stores — `sql_query` (DuckDB), `vector_search` (Qdrant, hybrid + reranker),
+`get_paper` (full markdown), `get_repo` (GitHub URLs already extracted in Phase 1). Local generation
+via Ollama or vLLM. Worth reusing rather than re-validating from scratch: Qwen2.5-7B-Instruct (int8
+via torchao) is already confirmed to fit comfortably on the RTX 5070 Ti from Phase 3.5's classifier
+work — a strong default candidate for the agent's LLM backbone too. RAGAS for end-to-end eval. Revisit
+and flesh this out once Phase 4 is actually done — no point over-planning it now.
+
 ## Project scope (locked) — v2, 2026-06-10
  
 Replan after external review: cut to the critical path that delivers the actual
