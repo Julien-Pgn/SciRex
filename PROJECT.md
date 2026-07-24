@@ -1,11 +1,16 @@
 # PROJECT.md — SciRex working state
 
-Last updated: 2026-07-01
+Last updated: 2026-07-24
 Repo: github.com/Julien-Pgn/scirex
 
 ## Current phase
 ✅ Phase 0 complete. Starting Phase 1 — ingestion.
 ✅ Phase 1 complete (2026-05-01). See full close-out in Decisions log.
+✅ Phase 3.5 complete (2026-07-24) — topic retrieval built and run end-to-end for "quantization":
+870 papers confirmed relevant (hybrid search + local LLM classifier), 863 fetched and OCR'd
+(7 permanent arXiv 404s). See full close-out in Decisions log.
+▶️ Next: Phase 4 (chunking + vector store) then Phase 5 (agent layer) — together, a working
+local RAG system over this corpus.
 
 ## Environment
 - Base image: `nvcr.io/nvidia/pytorch:26.01-py3` (Python 3.12.3, PyTorch 2.10.0a NV-patched, CUDA 13.1, sm_120 supported)
@@ -169,11 +174,47 @@ literally all of them).
 - `fetch_files.py --table topic_subset --topic quantization`: 307/310 PDFs+sources fetched
   successfully (99%); 3 failed on genuine arXiv-side 404s (not a systemic issue — resumable,
   re-running the same command will retry just those 3).
-- Deliberately NOT run tonight: `run_ocr.py` — the `chandra-vllm` OCR service wasn't running, and at
+- Deliberately NOT run that night: `run_ocr.py` — the `chandra-vllm` OCR service wasn't running, and at
   the established ~1000-papers/day OCR throughput, 310 papers would take multiple hours, well past
   the session's time budget. Left for a follow-up session.
 - `genai` was explicitly scoped out as a second validation topic for this phase (2026-07-23 decision)
   — it's a separate, unrelated topic, not a generalization test for this work.
+
+**`run_ocr.py` bug found and fixed (2026-07-23):** it selected PDFs via `args.input_dir.glob("*.pdf")`
+— every topic's fetched PDFs land in the same shared `data/raw/pdfs/`, so this silently OCR'd
+whichever topic's backlog happened to be sitting there (caught in practice: it picked up ~3000 old
+`genai_subset` PDFs instead of the intended quantization batch). `--keyword` was already documented
+as "the topic for this batch" but was never actually used to *select* files, only to label results
+afterward. Fixed: PDF selection is now `get_pdf_paths_for_keyword()` (new, in
+`src/scirex/ocr/modern/pipeline.py`), querying `paper_local WHERE keyword_for_ocr = --keyword AND
+pdf_path IS NOT NULL` — `--input-dir` removed entirely (the DB already has the full path, so a
+directory glob was redundant as well as unsafe). 4 new tests in `tests/test_ocr_pipeline.py`.
+
+**Second production run (2026-07-23, user's explicit choice): `search_topic.py --top-k 5000`**
+(overriding the recall-based default — see the `recommend_top_k` limitation above) — 870 verdict=TRUE,
+up from 310 at top_k=1000. `fetch_files.py` re-run picked up the delta (561 new candidates): 863/870
+fetched total (99.2%); the remaining 7 are confirmed *permanent* arXiv-side 404s (several repeat-failed
+across multiple fetch re-runs, not transient). `run_ocr.py` (with the fix above) processed all 863
+successfully.
+
+**Verification caught a subtle 2-paper gap (2026-07-24):** don't trust the DB flag alone — cross-checking
+`ocr_done` against the actual filesystem surfaced 2 papers whose `keyword_for_ocr` didn't say
+`"quantization"` despite having a `pdf_path` set. Both had been fetched under an *earlier* run before
+Step 6's `--topic` filter existed; since their `pdf_path` was already non-NULL, this quantization
+fetch correctly skipped re-downloading them (no need — the file was already there) but had no reason to
+touch their `keyword_for_ocr` label. One (`2605.12327`) already had valid Chandra OCR output from
+2026-06-17 (verified: proper markdown, extracted images, matches the current pipeline's output shape)
+— just needed its DB metadata corrected, not reprocessing, since `run_ocr.py`'s skip-if-exists check
+means a plain rerun never repairs stale metadata for a file that's already on disk. The other
+(`2605.29705`) had genuinely never been OCR'd — processed directly. Lesson: `keyword_for_ocr` is a
+single string, so a paper relevant to two topics fetched in different runs can only ever carry one
+label; fine for a single active topic, but worth remembering before assuming "labeled X" means
+"never touched by anything else."
+
+**Final verified state (2026-07-24): 863/863 quantization papers have both `ocr_done = TRUE` in
+`paper_local` and a real `.md` file on disk** (checked both ways, not just the DB flag). **Phase 3.5
+is done.** This corpus (plus the original ~900-paper benchmark set from Phase 3) is what Phase 4
+chunking will consume.
 
 ## Project scope (locked) — v2, 2026-06-10
  
@@ -218,6 +259,14 @@ data/raw/pdfs/ — ~900 PDFs
 data/raw/sources/ — ~900 source tarballs
 data/interim/latex/{arxiv_id}/ — 916 extracted LaTeX trees
 data/logs/fetch.log, data/logs/extract.log — structured run logs
+
+## Phase 3.5 artifacts (for reference)
+src/scirex/retrieval/{hybrid_search,embed,classify}.py — hybrid search + BGE-M3/Qwen2.5-7B wrappers
+scripts/embed_abstracts.py, scripts/search_topic.py — CLI scripts, same shape as fetch_files.py/run_ocr.py
+data/arxiv_metadata.duckdb — abstract_embeddings, topic_subset tables added
+data/quantization_rubric.txt — hand-written classification rubric for the "quantization" topic
+data/interim/quantization_golden_set_v2.parquet — hand-labeled golden set (20 positives)
+data/logs/embed.log, search_topic.log — structured run logs
 
 ## Resources
 - HF blog: https://huggingface.co/blog/nielsr/ocr-papers-jobs

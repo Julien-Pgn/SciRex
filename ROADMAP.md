@@ -2,7 +2,7 @@
 
 # Roadmap
 
-Critical path: **pipeline state → OCR corpus → chunking + vector store → retrieval eval → agent layer → digest + MCP**.
+Critical path: **pipeline state → OCR corpus → topic retrieval → chunking + vector store → retrieval eval → agent layer → digest + MCP**.
 Everything off this path is parked until the path is shippable end-to-end.
 
 | Phase | Scope                                                                                          | Status      |
@@ -11,6 +11,7 @@ Everything off this path is parked until the path is shippable end-to-end.
 | 1     | Ingestion (Kaggle dump → DuckDB, arXiv fetcher, LaTeX extraction)                              | done        |
 | 2     | Pipeline state in DuckDB: run journal, per-paper stage tracking, idempotent stages, backfill   | done        |
 | 3     | OCR corpus: Chandra-2 via vLLM on ~900 papers (truncation-flagged)                             | done        |
+| 3.5   | Topic retrieval: BGE-M3 hybrid search (dense+sparse, RRF) + local LLM classifier (Qwen2.5-7B-Instruct), replacing regex subset selection. First topic ("quantization") run end-to-end: 870 papers confirmed relevant, 863 fetched + OCR'd | done |
 | 4     | Chunking + vector store: markdown-aware chunker, `chunks` table, Qdrant hybrid (BGE-M3), golden eval set, Recall@k / MRR | todo |
 | 5     | Agent layer: tools over DuckDB + Qdrant (sql_query, vector_search, get_paper, get_repo), local LLM, RAGAS end-to-end eval | todo |
 | 6     | Intelligence layer: weekly delta ingest + interest-profile digest; expose agent as MCP server  | todo        |

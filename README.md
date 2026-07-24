@@ -11,6 +11,10 @@ scientific literature as a case study.
 
 **Working today:**
 - **Ingestion** — arXiv metadata into DuckDB, PDF/LaTeX-source fetching, LaTeX extraction.
+- **Topic retrieval** — hybrid dense+sparse search (BGE-M3 + Reciprocal Rank Fusion) over paper
+  abstracts, followed by a local LLM classifier (Qwen2.5-7B-Instruct) for precision cleanup.
+  Replaces regex-based subset selection and curates which papers enter the corpus before any
+  OCR compute is spent on them.
 - **OCR** — PDF-to-markdown conversion via Chandra/vLLM, with per-page stats tracked in DuckDB.
 
 **Planned, not yet implemented** (see `ROADMAP.md`): chunking + vector store,
